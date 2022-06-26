@@ -1,6 +1,7 @@
 from bsb.exceptions import *
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
+from bsb.morphologies.selector import MorphologySelector
 from .resource import Resource
 from .chunks import ChunkLoader, ChunkedProperty
 import numpy as np
@@ -12,7 +13,7 @@ _morpho_prop = lambda l: ChunkedProperty(l, "morphology", shape=(0,), dtype=int)
 _root = "/placement/"
 
 
-class _MapSelector:
+class _MapSelector(MorphologySelector):
     def __init__(self, ps, names):
         self._ps = ps
         self._names = set(names)
