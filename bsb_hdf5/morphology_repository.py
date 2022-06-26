@@ -1,6 +1,9 @@
 from bsb.morphologies import Morphology, Branch, _Labels
 from bsb.exceptions import *
-from bsb.storage.interfaces import MorphologyRepository as IMorphologyRepository, StoredMorphology
+from bsb.storage.interfaces import (
+    MorphologyRepository as IMorphologyRepository,
+    StoredMorphology,
+)
 from .resource import Resource
 import numpy as np
 import json
@@ -132,8 +135,15 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                     parents[branch] = i
                     ptr += len(branch)
                 root.create_dataset("graph", data=graph, dtype=int)
-                root.attrs["ldc"] = np.min(morphology._shared._points, axis=0)
-                root.attrs["mdc"] = np.max(morphology._shared._points, axis=0)
+                try:
+                    for k, v in morphology.meta.items():
+                        root.attrs[f"meta:{k}"] = v if v is not None else np.nan
+                except:
+                    raise MorphologyRepositoryError(
+                        f"Trying to store invalid {type(v)} metadata '{k}' on `{name}`."
+                    ) from None
+                root.attrs["meta:ldc"] = np.min(morphology._shared._points, axis=0)
+                root.attrs["meta:mdc"] = np.max(morphology._shared._points, axis=0)
 
     def remove(self, name):
         with self._engine._write():
@@ -145,4 +155,4 @@ class MorphologyRepository(Resource, IMorphologyRepository):
 
 
 def _meta(group):
-    return dict(group.attrs)
+    return dict((k[5:], v) for k, v in group.attrs.items() if k.startswith("meta:"))
