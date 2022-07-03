@@ -11,7 +11,7 @@ import h5py
 import os
 from mpilock import sync
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 class HDF5Engine(Engine):
