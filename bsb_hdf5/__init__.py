@@ -17,7 +17,6 @@ __version__ = "0.1.1"
 class HDF5Engine(Engine):
     def __init__(self, root):
         super().__init__(root)
-        self._root = root
         self._lock = sync()
 
     def __eq__(self, other):
@@ -56,9 +55,9 @@ class HDF5Engine(Engine):
     def move(self, new_root):
         from shutil import move
 
+        old_root = self._root
         with self._write():
-            move(self._root, new_root)
-
+            move(old_root, new_root)
         self._root = new_root
 
     def remove(self):
