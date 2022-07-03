@@ -1,7 +1,7 @@
 from bsb.core import Scaffold
 from bsb.config import Configuration
 from bsb.exceptions import *
-from . import StorageCase
+from . import StorageCase, MPI
 
 
 cfg = Configuration.default(cell_types=dict(a=dict(spatial=dict(radius=2, density=1e-3))))
@@ -10,6 +10,11 @@ cfg = Configuration.default(cell_types=dict(a=dict(spatial=dict(radius=2, densit
 class TestPlacementSet(StorageCase):
     def test_create(self):
         storage = self.random_storage()
-        ps = storage._PlacementSet.create(storage._engine, cfg.cell_types.a)
+        if not MPI.COMM_WORLD.Get_rank():
+            ps = storage._PlacementSet.create(storage._engine, cfg.cell_types.a)
+            MPI.COMM_WORLD.Barrier()
+        else:
+            MPI.COMM_WORLD.Barrier()
+            ps = storage._PlacementSet(storage._engine, cfg.cell_types.a)
         self.assertEqual("a", ps.tag, "tag should be cell type name")
         self.assertEqual(0, len(ps), "new ps should be empty")
