@@ -13,8 +13,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     .. note::
 
-        Use :meth:`Scaffold.get_connectivity_set <.core.Scaffold.get_connectivity_set>` to
-        correctly obtain a :class:`~.storage.interfaces.ConnectivitySet`.
+        Use :meth:`Scaffold.get_connectivity_set <bsb.core.Scaffold.get_connectivity_set>`
+        to correctly obtain a :class:`~bsb.storage.interfaces.ConnectivitySet`.
     """
 
     def __init__(self, engine, tag):

@@ -42,7 +42,7 @@ class PlacementSet(
 
     .. note::
 
-        Use :meth:`Scaffold.get_placement_set <.core.Scaffold.get_placement_set>` to
+        Use :meth:`Scaffold.get_placement_set <bsb.core.Scaffold.get_placement_set>` to
         correctly obtain a PlacementSet.
     """
 

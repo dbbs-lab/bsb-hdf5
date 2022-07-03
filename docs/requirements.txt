@@ -1,0 +1,10 @@
+sphinx==5.0.2
+colour==0.1.5
+errr==1.0.0
+numpy==1.19.4
+sphinxemoji==0.2.0
+toml==0.10.2
+furo==2022.6.21
+sphinx_design==0.2
+appdirs==1.4.4
+sphinx-copybutton==0.5.0

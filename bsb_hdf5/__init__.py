@@ -92,3 +92,6 @@ def _get_default_root():
 @config.node
 class StorageNode(IStorageNode):
     root = config.attr(type=str, default=_get_default_root, call_default=True)
+    """
+    Path to the HDF5 network storage file.
+    """

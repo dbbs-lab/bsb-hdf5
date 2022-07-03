@@ -4,7 +4,7 @@ data received from the placement module in seperate datasets to arbitrarily para
 and scale scaffold models.
 
 The module provides the :class:`.ChunkLoader` mixin for
-:class:`~.storage.engines.hdf5.resource.Resource` objects (e.g. PlacementSet,
+:class:`~.resource.Resource` objects (e.g. PlacementSet,
 ConnectivitySet) to organize :class:`.ChunkedProperty` and :class:`.ChunkedCollection`
 objects within them.
 """
@@ -17,7 +17,7 @@ import contextlib
 
 class ChunkLoader:
     """
-    :class:`~.storage.engines.hdf5.resource.Resource` mixin to organize chunked properties
+    :class:`~.resource.Resource` mixin to organize chunked properties
     and collections within itself.
 
     :param properties: An iterable of functions that construct :class:`.ChunkedProperty`.
@@ -72,7 +72,7 @@ class ChunkLoader:
         Return the full HDF5 path of a chunk.
 
         :param chunk: Chunk
-        :type chunk: :class:`.storage.Chunk`
+        :type chunk: :class:`bsb.storage.Chunk`
         :returns: HDF5 path
         :rtype: str
         """
@@ -210,7 +210,7 @@ class ChunkedProperty:
         Append data to a property chunk. Will create it if it doesn't exist.
 
         :param chunk: Chunk
-        :type chunk: :class:`.storage.Chunk`
+        :type chunk: :class:`bsb.storage.Chunk`
         """
         if self.insert is not None:
             data = self.insert(data)
