@@ -1,4 +1,5 @@
 from bsb import config
+from bsb.services import MPILock
 from bsb.config.nodes import StorageNode as IStorageNode
 from bsb.storage.interfaces import Engine
 from .placement_set import PlacementSet
@@ -9,20 +10,72 @@ from contextlib import contextmanager
 from datetime import datetime
 import h5py
 import os
-from mpilock import sync
+import shutil
+import shortuuid
 
 __version__ = "0.1.2"
 
 
+def on_main(prep=None, ret=None):
+    def decorator(f):
+        def wrapper(self, *args, **kwargs):
+            r = None
+            self.comm.Barrier()
+            if self.comm.Get_rank() == 0:
+                r = f(self, *args, **kwargs)
+            elif prep:
+                prep(self, *args, **kwargs)
+            self.comm.Barrier()
+            if not ret:
+                return self.comm.bcast(r, root=0)
+            else:
+                return ret(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def on_main_until(until, prep=None, ret=None):
+    def decorator(f):
+        def wrapper(self, *args, **kwargs):
+            global _procpass
+            r = None
+            self.comm.Barrier()
+            if self.comm.Get_rank() == 0:
+                r = f(self, *args, **kwargs)
+            elif prep:
+                prep(self, *args, **kwargs)
+            self.comm.Barrier()
+            while not until(self, *args, **kwargs):
+                pass
+            if not ret:
+                return self.comm.bcast(r, root=0)
+            else:
+                return ret(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def _set_root(self, root):
+    self._root = root
+
+
+def _set_active_cfg(self, config):
+    config._meta["active_config"] = True
+
+
 class HDF5Engine(Engine):
-    def __init__(self, root):
-        super().__init__(root)
-        self._lock = sync()
+    def __init__(self, root, comm):
+        super().__init__(root, comm)
+        self._lock = MPILock.sync()
 
     def __eq__(self, other):
-        return self._format == getattr(other, "_format", None) and self._root == getattr(
-            other, "_root", None
-        )
+        eq_format = self._format == getattr(other, "_format", None)
+        eq_root = self._root == getattr(other, "_root", None)
+        return eq_format and eq_root
 
     @property
     def root_slug(self):
@@ -43,47 +96,60 @@ class HDF5Engine(Engine):
     def exists(self):
         return os.path.exists(self._root)
 
+    @on_main_until(lambda s: s.exists())
     def create(self):
-        with self._write():
-            with self._handle("w") as handle:
-                handle.create_group("cells")
-                handle.create_group("placement")
-                handle.create_group("connectivity")
-                handle.create_group("files")
-                handle.create_group("morphologies")
+        with self._handle("w") as handle:
+            handle.create_group("cells")
+            handle.create_group("placement")
+            handle.create_group("connectivity")
+            handle.create_group("files")
+            handle.create_group("morphologies")
 
+    @on_main_until(lambda s, r: s.exists(), _set_root)
     def move(self, new_root):
-        from shutil import move
-
-        old_root = self._root
-        with self._write():
-            move(old_root, new_root)
+        shutil.move(self._root, new_root)
         self._root = new_root
 
+    @on_main_until(lambda s: not s.exists())
     def remove(self):
-        with self._write() as fence:
-            os.remove(self._root)
+        os.remove(self._root)
 
+    @on_main_until(
+        lambda s, ct: PlacementSet.exists(s, ct),
+        prep=None,
+        ret=lambda s, ct: PlacementSet(s, ct),
+    )
+    def require_placement_set(self, ct):
+        return PlacementSet.require(self, ct)
+
+    @on_main()
     def clear_placement(self):
-        with self._write():
-            with self._handle("a") as handle:
-                handle.require_group("placement")
-                del handle["placement"]
-                handle.require_group("placement")
+        with self._handle("a") as handle:
+            handle.require_group("placement")
+            del handle["placement"]
+            handle.require_group("placement")
 
+    @on_main()
     def clear_connectivity(self):
-        with self._write():
-            with self._handle("a") as handle:
-                handle.require_group("connectivity")
-                del handle["connectivity"]
-                handle.require_group("connectivity")
+        with self._handle("a") as handle:
+            handle.require_group("connectivity")
+            del handle["connectivity"]
+            handle.require_group("connectivity")
+
+    @on_main(prep=_set_active_cfg, ret=lambda s, c: c)
+    def store_active_config(self, config):
+        return self.files.store_active_config(config)
 
 
 def _get_default_root():
     return os.path.abspath(
         os.path.join(
             ".",
-            "scaffold_network_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".hdf5",
+            "scaffold_network_"
+            + datetime.now().strftime("%Y_%m_%d")
+            + "_"
+            + shortuuid.uuid()
+            + ".hdf5",
         )
     )
 

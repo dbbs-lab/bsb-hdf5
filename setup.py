@@ -11,6 +11,7 @@ with open("README.md", "r") as fh:
 
 requires = [
     "bsb~=4.0.0a23",
+    "shortuuid",
 ]
 
 setuptools.setup(
