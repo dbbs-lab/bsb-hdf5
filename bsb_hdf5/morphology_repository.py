@@ -130,10 +130,10 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                 parents = {None: -1}
                 ptr = 0
                 for i, branch in enumerate(morphology.branches):
+                    ptr += len(branch)
                     graph[i, 0] = ptr
                     graph[i, 1] = parents[branch.parent]
                     parents[branch] = i
-                    ptr += len(branch)
                 root.create_dataset("graph", data=graph, dtype=int)
                 try:
                     for k, v in morphology.meta.items():
