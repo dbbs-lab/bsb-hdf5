@@ -65,8 +65,13 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                 data = root["data"][()]
                 points = data[:, :3].copy()
                 radii = data[:, 3].copy()
-                labelsets = json.loads(root["data"].attrs["labels"])
-                labels = _Labels(len(points), buffer=data[:, 4].copy(), labels=labelsets)
+                # Turns the forced JSON str keys back into ints
+                labelsets = {
+                    int(k): v for k, v in json.loads(root["data"].attrs["labels"]).items()
+                }
+                labels = _Labels(
+                    len(points), buffer=data[:, 4].astype(int), labels=labelsets
+                )
                 prop_names = root["data"].attrs["properties"]
                 props = dict(zip(prop_names, np.rollaxis(data[:, 5:], 1)))
                 parents = {-1: None}
