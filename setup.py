@@ -10,7 +10,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 requires = [
-    "bsb~=4.0.0a23",
+    "bsb~=4.0.0a24",
+    "shortuuid",
 ]
 
 setuptools.setup(
