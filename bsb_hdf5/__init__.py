@@ -13,7 +13,7 @@ import os
 import shutil
 import shortuuid
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 
 def on_main(prep=None, ret=None):
