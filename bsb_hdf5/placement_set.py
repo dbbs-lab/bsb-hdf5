@@ -14,6 +14,10 @@ _root = "/placement/"
 
 
 class _MapSelector(MorphologySelector):
+    def __new__(cls, *args, **kwargs):
+        # Disable config node object creation
+        return object.__new__(cls)
+
     def __init__(self, ps, names):
         self._ps = ps
         self._names = set(names)
