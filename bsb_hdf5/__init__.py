@@ -96,7 +96,7 @@ class HDF5Engine(Engine):
     def exists(self):
         return os.path.exists(self._root)
 
-    @on_main_until(lambda s: s.exists())
+    @on_main_until(lambda self: self.exists())
     def create(self):
         with self._handle("w") as handle:
             handle.create_group("cells")
@@ -105,19 +105,23 @@ class HDF5Engine(Engine):
             handle.create_group("files")
             handle.create_group("morphologies")
 
-    @on_main_until(lambda s, r: s.exists(), _set_root)
+    @on_main_until(lambda self, r: self.exists(), _set_root)
     def move(self, new_root):
         shutil.move(self._root, new_root)
         self._root = new_root
 
-    @on_main_until(lambda s: not s.exists())
+    @on_main_until(lambda self, r: self.__class__(self.root, self.comm).exists())
+    def copy(self, new_root):
+        shutil.copy(self._root, new_root)
+
+    @on_main_until(lambda self: not self.exists())
     def remove(self):
         os.remove(self._root)
 
     @on_main_until(
-        lambda s, ct: PlacementSet.exists(s, ct),
+        lambda self, ct: PlacementSet.exists(self, ct),
         prep=None,
-        ret=lambda s, ct: PlacementSet(s, ct),
+        ret=lambda self, ct: PlacementSet(self, ct),
     )
     def require_placement_set(self, ct):
         return PlacementSet.require(self, ct)
@@ -136,7 +140,7 @@ class HDF5Engine(Engine):
             del handle["connectivity"]
             handle.require_group("connectivity")
 
-    @on_main(prep=_set_active_cfg, ret=lambda s, c: c)
+    @on_main(prep=_set_active_cfg, ret=lambda self, c: c)
     def store_active_config(self, config):
         return self.files.store_active_config(config)
 
