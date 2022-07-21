@@ -64,6 +64,8 @@ class PlacementSet(
         path = _root + tag
         with engine._write() as fence:
             with engine._handle("a") as h:
+                if path in h:
+                    raise DatasetExistsError(f"PlacementSet '{tag}' already exists.")
                 g = h.create_group(path)
                 chunks = g.create_group("chunks")
         return cls(engine, cell_type)
