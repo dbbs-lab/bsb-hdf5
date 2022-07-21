@@ -1,3 +1,3 @@
 h5py==3.6.0
-bsb[mpi]==4.0.0a27
+bsb[mpi]==4.0.0a28
 coverage==5.4
