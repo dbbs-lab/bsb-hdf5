@@ -14,6 +14,10 @@ _root = "/placement/"
 
 
 class _MapSelector(MorphologySelector):
+    def __new__(cls, *args, **kwargs):
+        # Disable config node object creation
+        return object.__new__(cls)
+
     def __init__(self, ps, names):
         self._ps = ps
         self._names = set(names)
@@ -64,6 +68,8 @@ class PlacementSet(
         path = _root + tag
         with engine._write() as fence:
             with engine._handle("a") as h:
+                if path in h:
+                    raise DatasetExistsError(f"PlacementSet '{tag}' already exists.")
                 g = h.create_group(path)
                 chunks = g.create_group("chunks")
         return cls(engine, cell_type)
