@@ -140,10 +140,6 @@ class HDF5Engine(Engine):
             del handle["connectivity"]
             handle.require_group("connectivity")
 
-    @on_main(prep=_set_active_cfg, ret=lambda self, c: c)
-    def store_active_config(self, config):
-        return self.files.store_active_config(config)
-
 
 def _get_default_root():
     return os.path.abspath(
