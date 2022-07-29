@@ -49,6 +49,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 g = h.create_group(path)
                 g.attrs["pre"] = pre_type.name
                 g.attrs["post"] = post_type.name
+                g.require_group(path + "/inc")
+                g.require_group(path + "/out")
         cs = cls(engine, tag)
         cs.pre = pre_type
         cs.post = post_type
@@ -82,6 +84,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
                         "Given and stored type mismatch:"
                         + f" {post_type.name} vs {g.attrs['post']}"
                     )
+                g.require_group(path + "/inc")
+                g.require_group(path + "/out")
         cs = cls(engine, tag)
         cs.pre = pre_type
         cs.post = post_type
@@ -90,24 +94,14 @@ class ConnectivitySet(Resource, IConnectivitySet):
     def clear(self):
         raise NotImplementedError("Will do once I have some sample data :)")
 
-    def append_data(self, src_chunk, dest_chunk, src_locs, dest_locs, handle=None):
-        if len(src_locs) != len(dest_locs):
-            raise ValueError("Connectivity matrices must be of same length.")
-        if handle is None:
-            with self._engine._write():
-                with self._engine._handle("a") as handle:
-                    self._append_data(src_chunk, dest_chunk, src_locs, dest_locs, handle)
-        else:
-            self._append_data(src_chunk, dest_chunk, src_locs, dest_locs, handle)
-
-    def muxed_append(self, pre_set, post_set, src_locs, dest_locs):
+    def connect(self, pre_set, post_set, src_locs, dest_locs):
         with self._engine._write():
             with self._engine._handle("a") as handle:
                 for data in self._demux(pre_set, post_set, src_locs, dest_locs):
                     if not len(data[-1]):
                         # Don't write empty data
                         continue
-                    self.append_data(*data, handle=handle)
+                    self.chunk_connect(*data, handle=handle)
 
     def _demux(self, pre, post, src_locs, dst_locs):
         dst_chunks = post.get_loaded_chunks()
@@ -136,44 +130,6 @@ class ConnectivitySet(Resource, IConnectivitySet):
             # We sifted `ln` cells out of the dataset, so reduce the ids.
             src_locs[:, 0] -= ln
             print(len(src_idx), "dropped to", len(src_locs))
-
-    def _append_data(self, src_chunk, dest_chunk, src_locs, dest_locs, h):
-        # Require the data
-        grp = h.require_group(f"{self._path}/{dest_chunk.id}")
-        src_id = str(src_chunk.id)
-        unpack_me = [None, None]
-        # require_dataset doesn't work for resizable datasets, see
-        # https://github.com/h5py/h5py/issues/2018
-        # So we create a little thingy for requiring src & dest
-        for i, tag in enumerate(("source_loc", "dest_loc")):
-            if tag in grp:
-                unpack_me[i] = grp[tag]
-            else:
-                unpack_me[i] = grp.create_dataset(
-                    tag, shape=(0, 3), dtype=int, chunks=(1024, 3), maxshape=(None, 3)
-                )
-        src_ds, dest_ds = unpack_me
-        # Move the pointers that keep track of the chunks
-        new_rows = len(src_locs)
-        total = len(src_ds)
-        print("Inserting", new_rows, "rows")
-        print("Total data length", total)
-        self._store_pointers(grp, src_chunk, new_rows, total)
-        iptr, eptr = self._get_insert_pointers(grp, src_chunk)
-        print("Stored data from line", iptr, "to", eptr)
-        if eptr is None:
-            eptr = total + new_rows
-        # Resize and insert data.
-        src_end = src_ds[(eptr - new_rows) :]
-        dest_end = dest_ds[(eptr - new_rows) :]
-        src_ds.resize(len(src_ds) + new_rows, axis=0)
-        dest_ds.resize(len(dest_ds) + new_rows, axis=0)
-        src_ds[iptr:eptr] = np.concatenate((src_ds[iptr : (eptr - new_rows)], src_locs))
-        src_ds[eptr:] = src_end
-        dest_ds[iptr:eptr] = np.concatenate(
-            (dest_ds[iptr : (eptr - new_rows)], dest_locs)
-        )
-        dest_ds[eptr:] = dest_end
 
     def _store_pointers(self, group, chunk, n, total):
         print("Storing pointers", chunk, n)
@@ -214,9 +170,62 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 grp = h[f"{self._path}/{dest_chunk.id}"]
                 src_chunks = grp.attrs["chunk_list"]
                 chunk_ptrs = [grp.attrs[str(Chunk(c, (0, 0, 0)).id)] for c in src_chunks]
-                src = grp["source_loc"][()]
-                dest = grp["dest_loc"][()]
+                src = grp["global_locs"][()]
+                dest = grp["local_locs"][()]
         return src_chunks, chunk_ptrs, src, dest
+
+    def chunk_connect(
+        self, local_chunk, global_chunk, local_locs, global_locs, handle=None
+    ):
+        if len(local_locs) != len(global_locs):
+            raise ValueError("Location matrices must be of same length.")
+        if handle is None:
+            with self._engine._write():
+                with self._engine._handle("a") as handle:
+                    self._connect(
+                        local_chunk, global_chunk, local_locs, global_locs, handle
+                    )
+        else:
+            self._connect(local_chunk, global_chunk, local_locs, global_locs, handle)
+
+    def _connect(self, src_chunk, dest_chunk, lloc, gloc, handle):
+        self._insert("inc", dest_chunk, src_chunk, gloc, lloc, handle)
+        self._insert("out", src_chunk, dest_chunk, lloc, gloc, handle)
+
+    def _insert(self, tag, local, global_, lloc, gloc, handle):
+        grp = h.require_group(f"{self._path}/{tag}/{local.id}")
+        src_id = str(global_.id)
+        unpack_me = [None, None]
+        # require_dataset doesn't work for resizable datasets, see
+        # https://github.com/h5py/h5py/issues/2018
+        # So we create a little thingy for requiring src & dest
+        for i, tag in enumerate(("global_locs", "local_locs")):
+            if tag in grp:
+                unpack_me[i] = grp[tag]
+            else:
+                unpack_me[i] = grp.create_dataset(
+                    tag, shape=(0, 3), dtype=int, chunks=(1024, 3), maxshape=(None, 3)
+                )
+        lcl_ds, gbl_ds = unpack_me
+        # Move the pointers that keep track of the chunks
+        new_rows = len(lloc)
+        total = len(lcl_ds)
+        print("Inserting", new_rows, "rows")
+        print("Total data length", total)
+        self._store_pointers(grp, local, new_rows, total)
+        iptr, eptr = self._get_insert_pointers(grp, local)
+        print("Stored data from line", iptr, "to", eptr)
+        if eptr is None:
+            eptr = total + new_rows
+        # Resize and insert data.
+        src_end = lcl_ds[(eptr - new_rows) :]
+        dest_end = gbl_ds[(eptr - new_rows) :]
+        lcl_ds.resize(len(lcl_ds) + new_rows, axis=0)
+        gbl_ds.resize(len(gbl_ds) + new_rows, axis=0)
+        lcl_ds[iptr:eptr] = np.concatenate((lcl_ds[iptr : (eptr - new_rows)], lloc))
+        lcl_ds[eptr:] = src_end
+        gbl_ds[iptr:eptr] = np.concatenate((gbl_ds[iptr : (eptr - new_rows)], gloc))
+        gbl_ds[eptr:] = dest_end
 
 
 def _sort_triple(a, b):
