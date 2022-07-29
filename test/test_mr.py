@@ -65,6 +65,7 @@ class TestHandcrafted(unittest.TestCase):
         if MPI.Get_rank() == 0:
             os.remove("test.h5")
             os.remove("test2.h5")
+            os.remove("test3.h5")
             os.remove("test4.h5")
             os.remove("test5.h5")
         MPI.Barrier()
