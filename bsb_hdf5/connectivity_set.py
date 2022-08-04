@@ -123,7 +123,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
             print(sum(src_idx), "connections found for", ln, "cells.")
             src_block = src_locs[src_idx]
             dst_block = dst_locs[src_idx]
-            block_idx = np.lexsort((src_block[:, 0], dst_block[:, 0]))
+            block_idx = np.lexsort((dst_block[:, 0], src_block[:, 0]))
             yield src, dst, src_block[block_idx], dst_block[block_idx]
             src_locs = src_locs[~src_idx]
             dst_locs = dst_locs[~src_idx]
@@ -193,7 +193,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         self._insert("out", src_chunk, dest_chunk, lloc, gloc, handle)
 
     def _insert(self, tag, local, global_, lloc, gloc, handle):
-        grp = h.require_group(f"{self._path}/{tag}/{local.id}")
+        grp = handle.require_group(f"{self._path}/{tag}/{local.id}")
         src_id = str(global_.id)
         unpack_me = [None, None]
         # require_dataset doesn't work for resizable datasets, see
