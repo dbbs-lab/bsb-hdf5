@@ -227,6 +227,59 @@ class ConnectivitySet(Resource, IConnectivitySet):
         gbl_ds[iptr:eptr] = np.concatenate((gbl_ds[iptr : (eptr - new_rows)], gloc))
         gbl_ds[eptr:] = dest_end
 
+    def nested_iter_connections(self, local_=None, global_=None, direction=None):
+        return CSIterator(self, direction, local_, global_)
+
+    def flat_iter_connections(self, local_=None, global_=None, direction=None):
+        raise NotImplementedError(
+            "Make it so that each result yields dir, local, and global, without need to nest for loops"
+        )
+
+    def load_connections(self, direction, local_, global_):
+        print("Load instruction received", direction, local_, global_)
+        raise NotImplementedError("Return edges that satisfy triple constraint")
+
+    def load_local_connections(self, direction, local_):
+        raise NotImplementedError(
+            "Return edges that satisfy double constraint as 1 big block, with gchunk as extra col or tuple with 2 items"
+        )
+
+    def load_all_connections(self, direction="out"):
+        raise NotImplementedError(
+            "Return all connections in the network, assumes everything is bidirectional."
+        )
+
+
+class CSIterator:
+    def __init__(self, cs, direction=None, local_=None, global_=None):
+        self._cs = cs
+        self._dir = direction
+        self._lchunks = local_
+        self._gchunks = global_
+
+    def __iter__(self):
+        if self._dir is None:
+            yield from (
+                (dir, CSIterator(self._cs, dir, self._lchunks, self._gchunks))
+                for dir in ("inc", "out")
+            )
+        elif not isinstance(self._lchunks, Chunk):
+            if self._lchunks is None:
+                self._lchunks = self._cs.get_local_chunks(self._dir)
+            yield from (
+                (lchunk, CSIterator(self._cs, self._dir, lchunk, self._gchunks))
+                for lchunk in self._lchunks
+            )
+        elif not isinstance(self._gchunks, Chunk):
+            if self._gchunks is None:
+                self._gchunks = self._cs.get_global_chunks(self._dir, self._lchunks)
+            yield from (
+                (gchunk, CSIterator(self._cs, self._dir, self._lchunks, gchunk))
+                for gchunk in self._gchunks
+            )
+        else:
+            return self.load_connections(self._dir, self._lchunks, self._gchunks)
+
 
 def _sort_triple(a, b):
     # Comparator for chunks by bitshift and sum of the coords.
