@@ -29,6 +29,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 self._pre_name = h[self._path].attrs["pre"]
                 self._post_name = h[self._path].attrs["post"]
 
+    def __len__(self):
+        count = 0
+        for lchunk, itr in self.nested_iter_connections("inc"):
+            for _, (l, g) in itr:
+                count += len(l)
+        return count
+
     @classmethod
     def get_tags(cls, engine):
         with engine._read():
@@ -227,17 +234,45 @@ class ConnectivitySet(Resource, IConnectivitySet):
         gbl_ds[iptr:eptr] = np.concatenate((gbl_ds[iptr : (eptr - new_rows)], gloc))
         gbl_ds[eptr:] = dest_end
 
-    def nested_iter_connections(self, local_=None, global_=None, direction=None):
+    def get_local_chunks(self, direction):
+        with self._engine._read():
+            with self._engine._handle("r") as handle:
+                return [
+                    Chunk.from_id(int(k), None)
+                    for k in handle[self._path][direction].keys()
+                ]
+
+    def get_global_chunks(self, direction, local_):
+        with self._engine._read():
+            with self._engine._handle("r") as handle:
+                print(
+                    "CHUNK LIST",
+                    handle[self._path][f"{direction}/{local_.id}"].attrs["chunk_list"],
+                )
+                return [
+                    Chunk(k, None)
+                    for k in handle[self._path][f"{direction}/{local_.id}"].attrs[
+                        "chunk_list"
+                    ]
+                ]
+
+    def nested_iter_connections(self, direction=None, local_=None, global_=None):
         return CSIterator(self, direction, local_, global_)
 
-    def flat_iter_connections(self, local_=None, global_=None, direction=None):
+    def flat_iter_connections(self, direction=None, local_=None, global_=None):
         raise NotImplementedError(
             "Make it so that each result yields dir, local, and global, without need to nest for loops"
         )
 
     def load_connections(self, direction, local_, global_):
         print("Load instruction received", direction, local_, global_)
-        raise NotImplementedError("Return edges that satisfy triple constraint")
+        with self._engine._read():
+            with self._engine._handle("r") as handle:
+                local_grp = handle[self._path][f"{direction}/{local_.id}"]
+                start, end = self._get_insert_pointers(local_grp, global_)
+                print(f"Found {start} connections")
+                idx = slice(start, end)
+                return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
 
     def load_local_connections(self, direction, local_):
         raise NotImplementedError(
@@ -246,7 +281,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     def load_all_connections(self, direction="out"):
         raise NotImplementedError(
-            "Return all connections in the network, assumes everything is bidirectional."
+            "Return all connections in the network, assumes everything is bidirectional and focuses on outgoing connections by defaults."
         )
 
 
@@ -274,11 +309,9 @@ class CSIterator:
             if self._gchunks is None:
                 self._gchunks = self._cs.get_global_chunks(self._dir, self._lchunks)
             yield from (
-                (gchunk, CSIterator(self._cs, self._dir, self._lchunks, gchunk))
+                (gchunk, self._cs.load_connections(self._dir, self._lchunks, gchunk))
                 for gchunk in self._gchunks
             )
-        else:
-            return self.load_connections(self._dir, self._lchunks, self._gchunks)
 
 
 def _sort_triple(a, b):
