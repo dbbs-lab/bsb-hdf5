@@ -30,11 +30,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 self._post_name = h[self._path].attrs["post"]
 
     def __len__(self):
-        count = 0
-        for lchunk, itr in self.nested_iter_connections("inc"):
-            for _, (l, g) in itr:
-                count += len(l)
-        return count
+        return sum(len(data[0]) for _, _, _, data in self.flat_iter_connections("inc"))
 
     @classmethod
     def get_tags(cls, engine):
@@ -245,9 +241,12 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return CSIterator(self, direction, local_, global_)
 
     def flat_iter_connections(self, direction=None, local_=None, global_=None):
-        raise NotImplementedError(
-            "Make it so that each result yields dir, local, and global, without need to nest for loops"
-        )
+        itr = CSIterator(self, direction, local_, global_)
+        for dir in itr.get_dir_iter(direction):
+            for lchunk in itr.get_local_iter(dir, local_):
+                for gchunk in itr.get_global_iter(dir, lchunk, global_):
+                    conns = self.load_connections(dir, lchunk, gchunk)
+                    yield (dir, lchunk, gchunk, conns)
 
     def load_connections(self, direction, local_, global_):
         with self._engine._read():
@@ -279,22 +278,44 @@ class CSIterator:
         if self._dir is None:
             yield from (
                 (dir, CSIterator(self._cs, dir, self._lchunks, self._gchunks))
-                for dir in ("inc", "out")
+                for dir in self.get_dir_iter(self._dir)
             )
         elif not isinstance(self._lchunks, Chunk):
-            if self._lchunks is None:
-                self._lchunks = self._cs.get_local_chunks(self._dir)
             yield from (
                 (lchunk, CSIterator(self._cs, self._dir, lchunk, self._gchunks))
-                for lchunk in self._lchunks
+                for lchunk in self.get_local_iter(self._dir, self._lchunks)
             )
         elif not isinstance(self._gchunks, Chunk):
-            if self._gchunks is None:
-                self._gchunks = self._cs.get_global_chunks(self._dir, self._lchunks)
             yield from (
                 (gchunk, self._cs.load_connections(self._dir, self._lchunks, gchunk))
-                for gchunk in self._gchunks
+                for gchunk in self.get_global_iter(
+                    self._dir, self._lchunks, self._gchunks
+                )
             )
+        else:
+            yield self._cs.load_connections(self._dir, self._lchunks, self._gchunks)
+
+    def get_dir_iter(self, dir):
+        if dir is None:
+            return ("inc", "out")
+        else:
+            return (dir,)
+
+    def get_local_iter(self, dir, local_):
+        if local_ is None:
+            return self._cs.get_local_chunks(dir)
+        elif isinstance(local_, Chunk):
+            return (local_,)
+        else:
+            return iter(local_)
+
+    def get_global_iter(self, dir, local_, global_):
+        if global_ is None:
+            return self._cs.get_global_chunks(dir, local_)
+        elif isinstance(global_, Chunk):
+            return (global_,)
+        else:
+            return iter(global_)
 
 
 def _sort_triple(a, b):
