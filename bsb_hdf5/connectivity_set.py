@@ -112,42 +112,38 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     def _demux(self, pre, post, src_locs, dst_locs):
         dst_chunks = post.get_loaded_chunks()
-        if len(dst_chunks) != 1:
-            warn(
-                f"{self.tag} data corrupted, destination chunks mixed up."
-                + " Data saved to prevent loss, but likely incorrect.",
-                CriticalDataWarning,
-            )
-        dst = next(iter(dst_chunks))
-        print("Total of", len(src_locs), "connections")
+        lns = []
+        for dst in iter(dst_chunks):
+            with post.chunk_context(dst):
+                lns.append(len(post))
         # Iterate over each source chunk
         for src in pre.get_loaded_chunks():
             # Count the number of cells
             with pre.chunk_context(src):
                 ln = len(pre)
-                print("Demuxing", ln, "cells")
             src_idx = src_locs[:, 0] < ln
-            print(sum(src_idx), "connections found for", ln, "cells.")
             src_block = src_locs[src_idx]
             dst_block = dst_locs[src_idx]
-            block_idx = np.lexsort((dst_block[:, 0], src_block[:, 0]))
-            yield src, dst, src_block[block_idx], dst_block[block_idx]
+            if len(dst_chunks) == 1:
+                block_idx = np.lexsort((dst_block[:, 0], src_block[:, 0]))
+                yield src, dst, src_block[block_idx], dst_block[block_idx]
+            else:
+                dctr = 0
+                for dst, dln in zip(iter(dst_chunks), lns):
+                    block_idx = (dst_block[:, 0] >= dctr) & (dst_block[:, 0] < dctr + dln)
+                    yield src, dst, src_block[block_idx], dst_block[block_idx]
+                    dctr += dln
             src_locs = src_locs[~src_idx]
             dst_locs = dst_locs[~src_idx]
             # We sifted `ln` cells out of the dataset, so reduce the ids.
             src_locs[:, 0] -= ln
-            print(len(src_idx), "dropped to", len(src_locs))
 
     def _store_pointers(self, group, chunk, n, total):
-        print("Storing pointers", chunk, n)
         chunks = [Chunk(t, (0, 0, 0)) for t in group.attrs.get("chunk_list", [])]
-        print("Chunks already present:", chunks)
         if chunk in chunks:
-            print("Just moving up pointers")
             # Source chunk already existed, just increment the subseq. pointers
             inc_from = chunks.index(chunk) + 1
         else:
-            print("Appending new chunk to end")
             # We are the last chunk, we start adding rows at the end.
             group.attrs[str(chunk.id)] = total
             # Move up the increment pointer to place ourselves after the
@@ -181,26 +177,22 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 dest = grp["local_locs"][()]
         return src_chunks, chunk_ptrs, src, dest
 
-    def chunk_connect(
-        self, local_chunk, global_chunk, local_locs, global_locs, handle=None
-    ):
-        if len(local_locs) != len(global_locs):
+    def chunk_connect(self, src_chunk, dst_chunk, src_locs, dst_locs, handle=None):
+        if len(src_locs) != len(dst_locs):
             raise ValueError("Location matrices must be of same length.")
         if handle is None:
             with self._engine._write():
                 with self._engine._handle("a") as handle:
-                    self._connect(
-                        local_chunk, global_chunk, local_locs, global_locs, handle
-                    )
+                    self._connect(src_chunk, dst_chunk, src_locs, dst_locs, handle)
         else:
-            self._connect(local_chunk, global_chunk, local_locs, global_locs, handle)
+            self._connect(src_chunk, dst_chunk, src_locs, dst_locs, handle)
 
     def _connect(self, src_chunk, dest_chunk, lloc, gloc, handle):
         self._insert("inc", dest_chunk, src_chunk, gloc, lloc, handle)
         self._insert("out", src_chunk, dest_chunk, lloc, gloc, handle)
 
-    def _insert(self, tag, local, global_, lloc, gloc, handle):
-        grp = handle.require_group(f"{self._path}/{tag}/{local.id}")
+    def _insert(self, tag, local_, global_, lloc, gloc, handle):
+        grp = handle.require_group(f"{self._path}/{tag}/{local_.id}")
         src_id = str(global_.id)
         unpack_me = [None, None]
         # require_dataset doesn't work for resizable datasets, see
@@ -217,11 +209,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
         # Move the pointers that keep track of the chunks
         new_rows = len(lloc)
         total = len(lcl_ds)
-        print("Inserting", new_rows, "rows")
-        print("Total data length", total)
-        self._store_pointers(grp, local, new_rows, total)
-        iptr, eptr = self._get_insert_pointers(grp, local)
-        print("Stored data from line", iptr, "to", eptr)
+        self._store_pointers(grp, global_, new_rows, total)
+        iptr, eptr = self._get_insert_pointers(grp, global_)
         if eptr is None:
             eptr = total + new_rows
         # Resize and insert data.
@@ -245,10 +234,6 @@ class ConnectivitySet(Resource, IConnectivitySet):
     def get_global_chunks(self, direction, local_):
         with self._engine._read():
             with self._engine._handle("r") as handle:
-                print(
-                    "CHUNK LIST",
-                    handle[self._path][f"{direction}/{local_.id}"].attrs["chunk_list"],
-                )
                 return [
                     Chunk(k, None)
                     for k in handle[self._path][f"{direction}/{local_.id}"].attrs[
@@ -265,12 +250,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
         )
 
     def load_connections(self, direction, local_, global_):
-        print("Load instruction received", direction, local_, global_)
         with self._engine._read():
             with self._engine._handle("r") as handle:
                 local_grp = handle[self._path][f"{direction}/{local_.id}"]
                 start, end = self._get_insert_pointers(local_grp, global_)
-                print(f"Found {start} connections")
                 idx = slice(start, end)
                 return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
 
