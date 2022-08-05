@@ -151,6 +151,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
         for c in chunks[inc_from:]:
             group.attrs[str(c.id)] += n
 
+    def _get_sorted_pointers(self, group):
+        chunks = [Chunk(t, (0, 0, 0)) for t in group.attrs["chunk_list"]]
+        ptrs = np.array([group.attrs[str(c.id)] for c in chunks])
+        sorted = np.argsort(ptrs)
+        chunks = [chunks[cid] for cid in sorted]
+        return chunks, ptrs[sorted]
+
     def _get_insert_pointers(self, group, chunk):
         chunks = [Chunk(t, (0, 0, 0)) for t in group.attrs["chunk_list"]]
         iptr = group.attrs[str(chunk.id)]
@@ -248,23 +255,34 @@ class ConnectivitySet(Resource, IConnectivitySet):
                     conns = self.load_connections(dir, lchunk, gchunk)
                     yield (dir, lchunk, gchunk, conns)
 
-    def load_connections(self, direction, local_, global_):
-        with self._engine._read():
-            with self._engine._handle("r") as handle:
-                local_grp = handle[self._path][f"{direction}/{local_.id}"]
-                start, end = self._get_insert_pointers(local_grp, global_)
-                idx = slice(start, end)
-                return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
+    def load_connections(self, direction, local_, global_, handle=None):
+        if handle is None:
+            with self._engine._read():
+                with self._engine._handle("r") as handle:
+                    return self._load_connections(direction, local_, global_, handle)
+        else:
+            return self._load_connections(direction, local_, global_, handle)
 
-    def load_local_connections(self, direction, local_):
-        raise NotImplementedError(
-            "Return edges that satisfy double constraint as 1 big block, with gchunk as extra col or tuple with 2 items"
-        )
+    def _load_connections(self, direction, local_, global_, handle):
+        local_grp = handle[self._path][f"{direction}/{local_.id}"]
+        start, end = self._get_insert_pointers(local_grp, global_)
+        idx = slice(start, end)
+        return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
 
-    def load_all_connections(self, direction="out"):
-        raise NotImplementedError(
-            "Return all connections in the network, assumes everything is bidirectional and focuses on outgoing connections by defaults."
-        )
+    def load_local_connections(self, direction, local_, handle=None):
+        if handle is None:
+            with self._engine._read():
+                with self._engine._handle("r") as handle:
+                    return self._load_local(direction, local_, handle)
+        else:
+            return self._load_local(direction, local_, handle)
+
+    def _load_local(self, direction, local_, handle):
+        local_grp = handle[self._path][f"{direction}/{local_.id}"]
+        global_locs = local_grp["global_locs"][()]
+        chunks, ptrs = self._get_sorted_pointers(local_grp)
+        col = np.repeat([c.id for c in chunks], np.diff(ptrs, append=len(global_locs)))
+        return (local_grp["local_locs"][()], col, global_locs)
 
 
 class CSIterator:
