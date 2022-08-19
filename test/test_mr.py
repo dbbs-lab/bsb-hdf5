@@ -11,7 +11,7 @@ class TestHandcrafted(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        if MPI.Get_rank() == 0:
+        if MPI.get_rank() == 0:
             with h5py.File("test.h5", "w") as f:
                 g = f.create_group("morphologies")
                 g = g.create_group("M")
@@ -57,18 +57,18 @@ class TestHandcrafted(unittest.TestCase):
                 ds.attrs["labels"] = json.dumps({1: []})
                 ds.attrs["properties"] = []
                 g.create_dataset("graph", data=[[i + 1, -1] for i in range(4)] + [[5, 0]])
-        MPI.Barrier()
+        MPI.barrier()
 
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        if MPI.Get_rank() == 0:
+        if MPI.get_rank() == 0:
             os.remove("test.h5")
             os.remove("test2.h5")
             os.remove("test3.h5")
             os.remove("test4.h5")
             os.remove("test5.h5")
-        MPI.Barrier()
+        MPI.barrier()
 
     def test_empty_repository(self):
         pass

@@ -13,19 +13,19 @@ import os
 import shutil
 import shortuuid
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 
 def on_main(prep=None, ret=None):
     def decorator(f):
         def wrapper(self, *args, **kwargs):
             r = None
-            self.comm.Barrier()
-            if self.comm.Get_rank() == 0:
+            self.comm.barrier()
+            if self.comm.get_rank() == 0:
                 r = f(self, *args, **kwargs)
             elif prep:
                 prep(self, *args, **kwargs)
-            self.comm.Barrier()
+            self.comm.barrier()
             if not ret:
                 return self.comm.bcast(r, root=0)
             else:
@@ -41,12 +41,12 @@ def on_main_until(until, prep=None, ret=None):
         def wrapper(self, *args, **kwargs):
             global _procpass
             r = None
-            self.comm.Barrier()
-            if self.comm.Get_rank() == 0:
+            self.comm.barrier()
+            if self.comm.get_rank() == 0:
                 r = f(self, *args, **kwargs)
             elif prep:
                 prep(self, *args, **kwargs)
-            self.comm.Barrier()
+            self.comm.barrier()
             while not until(self, *args, **kwargs):
                 pass
             if not ret:

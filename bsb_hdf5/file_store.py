@@ -69,12 +69,12 @@ class FileStore(Resource, IFileStore):
 
     def store_active_config(self, config):
         id = self._active_config_id()
-        self._engine.comm.Barrier()
-        if id is not None and self._engine.comm.Get_rank() == 0:
+        self._engine.comm.barrier()
+        if id is not None and self._engine.comm.get_rank() == 0:
             self.remove(id)
         config._meta["active_config"] = True
         active_id = None
-        if self._engine.comm.Get_rank() == 0:
+        if self._engine.comm.get_rank() == 0:
             meta = {k: v for k, v in config._meta.items() if v is not None}
             active_id = self.store(json.dumps(config.__tree__()), meta)
         return self._engine.comm.bcast(active_id, root=0)
