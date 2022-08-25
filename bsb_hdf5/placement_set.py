@@ -1,4 +1,5 @@
 from bsb.exceptions import *
+from bsb.storage import Chunk
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
 from bsb.morphologies.selector import MorphologySelector
@@ -185,6 +186,10 @@ class PlacementSet(
           rotational or morphological data.
         :type count: int
         """
+        if not isinstance(chunk, Chunk):
+            chunk = Chunk(chunk, None)
+        if positions is not None:
+            positions = np.array(positions, copy=False)
         if count is not None:
             if not (positions is None and morphologies is None):
                 raise ValueError(
