@@ -129,6 +129,12 @@ class ConnectivitySet(Resource, IConnectivitySet):
         raise NotImplementedError("Will do once I have some sample data :)")
 
     def connect(self, pre_set, post_set, src_locs, dest_locs):
+        src_locs = np.array(src_locs, copy=False)
+        dest_locs = np.array(dest_locs, copy=False)
+        if not len(src_locs):
+            return
+        if len(src_locs) != len(dest_locs):
+            raise ValueError("Location matrices must be of same length.")
         with self._engine._write():
             with self._engine._handle("a") as handle:
                 for data in self._demux(pre_set, post_set, src_locs, dest_locs):
