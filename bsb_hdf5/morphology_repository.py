@@ -1,5 +1,5 @@
 from bsb.morphologies import Morphology, Branch, _Labels
-from bsb.exceptions import *
+from bsb.exceptions import MorphologyRepositoryError, MissingMorphologyError
 from bsb.storage.interfaces import (
     MorphologyRepository as IMorphologyRepository,
     StoredMorphology,
@@ -58,7 +58,7 @@ class MorphologyRepository(Resource, IMorphologyRepository):
             with self._engine._handle("r") as repo:
                 try:
                     root = repo[f"{self._path}/{name}/"]
-                except:
+                except Exception:
                     raise MissingMorphologyError(
                         f"`{self._engine.root}` contains no morphology named `{name}`."
                     ) from None
@@ -111,8 +111,9 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                     if overwrite:
                         self.remove(name)
                     else:
+                        root = self._engine.root
                         raise MorphologyRepositoryError(
-                            f"A morphology called '{name}' already exists in `{self._engine.root}`."
+                            f"A morphology called '{name}' already exists in `{root}`."
                         )
                 root = me.create_group(name)
                 # Optimizing a morphology goes through the same steps as what is required
@@ -143,7 +144,7 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                 try:
                     for k, v in morphology.meta.items():
                         root.attrs[f"meta:{k}"] = v if v is not None else np.nan
-                except:
+                except Exception:
                     raise MorphologyRepositoryError(
                         f"Trying to store invalid {type(v)} metadata '{k}' on `{name}`."
                     ) from None

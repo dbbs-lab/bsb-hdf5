@@ -9,7 +9,6 @@ ConnectivitySet) to organize :class:`.ChunkedProperty` and :class:`.ChunkedColle
 objects within them.
 """
 
-from .resource import Resource
 from bsb.storage._chunks import Chunk
 import numpy as np
 import contextlib

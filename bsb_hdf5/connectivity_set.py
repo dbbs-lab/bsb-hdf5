@@ -1,4 +1,4 @@
-from bsb.exceptions import *
+from bsb.exceptions import DatasetNotFoundError
 from .resource import Resource
 from bsb.storage._chunks import Chunk
 from bsb.storage.interfaces import ConnectivitySet as IConnectivitySet
@@ -44,13 +44,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
     @classmethod
     def create(cls, engine, pre_type, post_type, tag=None):
         """
-        Create the structure for this connectivity set in the HDF5 file. Connectivity sets are
-        stored under ``/connectivity/<tag>``.
+        Create the structure for this connectivity set in the HDF5 file. Connectivity sets
+        are stored under ``/connectivity/<tag>``.
         """
         if tag is None:
             tag = f"{pre_type.name}_to_{post_type.name}"
         path = _root + tag
-        with engine._write() as fence:
+        with engine._write():
             with engine._handle("a") as h:
                 g = h.create_group(path)
                 g.attrs["pre"] = pre_type.name
@@ -77,7 +77,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :returns: Whether the tag exists.
         :rtype: bool
         """
-        check = lambda h: _root + tag in h
+
+        def check(h):
+            return _root + tag in h
+
         if handle is not None:
             return check(handle)
         else:
@@ -233,7 +236,6 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     def _insert(self, tag, local_, global_, lloc, gloc, handle):
         grp = handle.require_group(f"{self._path}/{tag}/{local_.id}")
-        src_id = str(global_.id)
         unpack_me = [None, None]
         # require_dataset doesn't work for resizable datasets, see
         # https://github.com/h5py/h5py/issues/2018
