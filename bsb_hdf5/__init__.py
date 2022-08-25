@@ -6,7 +6,6 @@ from .placement_set import PlacementSet
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
 from .morphology_repository import MorphologyRepository
-from contextlib import contextmanager
 from datetime import datetime
 import h5py
 import os
@@ -14,6 +13,14 @@ import shutil
 import shortuuid
 
 __version__ = "0.3.1"
+__all__ = [
+    "PlacementSet",
+    "ConnectivitySet",
+    "FileStore",
+    "MorphologyRepository",
+    "HDF5Engine",
+    "StorageNode",
+]
 
 
 def on_main(prep=None, ret=None):
