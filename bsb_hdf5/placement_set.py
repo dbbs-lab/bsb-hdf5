@@ -14,15 +14,15 @@ import itertools
 
 
 def _pos_prop(loader):
-    ChunkedProperty(loader, "position", shape=(0, 3), dtype=float)
+    return ChunkedProperty(loader, "position", shape=(0, 3), dtype=float)
 
 
 def _rot_prop(loader):
-    ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float)
+    return ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float)
 
 
 def _morpho_prop(loader):
-    ChunkedProperty(loader, "morphology", shape=(0,), dtype=int)
+    return ChunkedProperty(loader, "morphology", shape=(0,), dtype=int)
 
 
 _root = "/placement/"
