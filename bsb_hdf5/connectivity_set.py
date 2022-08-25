@@ -284,9 +284,62 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 ]
 
     def nested_iter_connections(self, direction=None, local_=None, global_=None):
+        """
+        Iterates over the connectivity data, leaving room for the end-user to set up
+        nested for loops:
+
+        .. code-block:: python
+
+          for dir, itr in self.nested_iter_connections():
+              for lchunk, itr in itr:
+                  print("I can do something at the start of a new local chunk")
+                  for gchunk, data in itr:
+                      print(f"Nested {dir} block between {lchunk} and {gchunk}")
+                  print("Or right before we move to the next local chunk")
+
+        If a keyword argument is given, that axis is not iterated over, and the amount of
+        nested loops is reduced.
+
+        :param direction: When omitted, iterates ``inc`` and ``out``, otherwise when
+          given, pins it to the given value
+        :type direction: str
+        :param local_: When omitted, iterates over all local chunks in the set. When
+          given, it restricts the iteration to the given value(s).
+        :type local_: Union[Chunk, list[Chunk]]
+        :param global_: When omitted, iterates over all global chunks in the set. When
+          given, it restricts the iteration to the given value(s).
+        :type global_: Union[Chunk, list[Chunk]]
+        :returns: An iterator that produces the next unrestricted iteration values, or
+          the connection dataset that matches the iteration combination.
+        """
         return CSIterator(self, direction, local_, global_)
 
     def flat_iter_connections(self, direction=None, local_=None, global_=None):
+        """
+        Iterates over the connectivity data.
+
+        .. code-block:: python
+
+          for dir, lchunk, gchunk, data in self.flat_iter_connections():
+              print(f"Flat {dir} block between {lchunk} and {gchunk}")
+
+        If a keyword argument is given, that axis is not iterated over, and the value is
+        fixed in each iteration.
+
+        :param direction: When omitted, iterates ``inc`` and ``out``. When given, it
+          restricts the iteration to the given value.
+        :type direction: str
+        :param local_: When omitted, iterates over all local chunks in the set. When
+          given, it restricts the iteration to the given value(s).
+        :type local_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
+        :param global_: When omitted, iterates over all global chunks in the set. When
+          given, it restricts the iteration to the given value(s).
+        :type global_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
+        :returns: Yields the direction, local chunk, global chunk, and data. The data is a
+          tuple of the local and global connection locations.
+        :rtype: Tuple[str, ~bsb.storage.Chunk, ~bsb.storage.Chunk,
+          Tuple[np.ndarray, np.ndarray]]
+        """
         itr = CSIterator(self, direction, local_, global_)
         for dir in itr.get_dir_iter(direction):
             for lchunk in itr.get_local_iter(dir, local_):
@@ -295,6 +348,20 @@ class ConnectivitySet(Resource, IConnectivitySet):
                     yield (dir, lchunk, gchunk, conns)
 
     def load_connections(self, direction, local_, global_, handle=None):
+        """
+        Load the connection block with given direction between the given local and global
+        chunk.
+
+        :param direction: Either ``inc`` to load the connections from the incoming
+          perspective or ``out`` for the outgoing perspective.
+        :type direction: str
+        :param local_: Local chunk
+        :type local_: ~bsb.storage.Chunk
+        :param global_: Global chunk
+        :type global_: ~bsb.storage.Chunk
+        :returns: The local and global connections locations
+        :rtype: Tuple[np.ndarray, np.ndarray]
+        """
         if handle is None:
             with self._engine._read():
                 with self._engine._handle("r") as handle:
@@ -309,6 +376,22 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
 
     def load_local_connections(self, direction, local_, handle=None):
+        """
+        Load all the connections of the given local chunk.
+
+        :param direction: Either ``inc`` to load the connections from the incoming
+          perspective or ``out`` for the outgoing perspective.
+        :type direction: str
+        :param local_: Local chunk
+        :type local_: ~bsb.storage.Chunk
+        :param global_: Global chunk
+        :type global_: ~bsb.storage.Chunk
+        :returns: The local connection locations, a vector of the global connection chunks
+          (1 chunk id per connection) and the global connections locations. To identify a
+          cell in the global connections, use the corresponding chunk id from the second
+          return value.
+        :rtype: Tuple[np.ndarray, np.ndarray, np.ndarray]
+        """
         if handle is None:
             with self._engine._read():
                 with self._engine._handle("r") as handle:
