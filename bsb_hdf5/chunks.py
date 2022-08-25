@@ -85,15 +85,16 @@ class ChunkLoader:
         """
         Add a chunk to read data from when loading properties/collections.
         """
-        self._chunks.add(chunk)
+        self._chunks.add(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
     def unload_chunk(self, chunk):
         """
         Remove a chunk to read data from when loading properties/collections.
         """
-        self._chunks.discard(chunk)
+        self._chunks.discard(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
     def set_chunks(self, chunks):
+        chunks = _to_chunklist(chunks)
         self._chunks = set(chunks)
 
     def clear_chunks(self):
@@ -138,6 +139,10 @@ class ChunkLoader:
 
     def _get_chunk_size(self, handle):
         return handle.attrs["chunk_size"]
+
+
+def _to_chunklist(chunks):
+    return [c if isinstance(c, Chunk) else Chunk(c, None) for c in chunks]
 
 
 class ChunkedProperty:
