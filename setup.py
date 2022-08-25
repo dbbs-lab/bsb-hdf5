@@ -48,5 +48,5 @@ setuptools.setup(
         "Documentation": "https://bsb-hdf5.readthedocs.io/",
         "Source Code": "https://github.com/dbbs-lab/bsb-hdf5/",
     },
-    extras_require={},
+    extras_require={"dev": ["sphinx", "sphinxemoji", "furo", "sphinx_design"]},
 )

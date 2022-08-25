@@ -305,10 +305,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type direction: str
         :param local_: When omitted, iterates over all local chunks in the set. When
           given, it restricts the iteration to the given value(s).
-        :type local_: Union[Chunk, list[Chunk]]
+        :type local_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
         :param global_: When omitted, iterates over all global chunks in the set. When
           given, it restricts the iteration to the given value(s).
-        :type global_: Union[Chunk, list[Chunk]]
+        :type global_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
         :returns: An iterator that produces the next unrestricted iteration values, or
           the connection dataset that matches the iteration combination.
         """
@@ -338,7 +338,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :returns: Yields the direction, local chunk, global chunk, and data. The data is a
           tuple of the local and global connection locations.
         :rtype: Tuple[str, ~bsb.storage.Chunk, ~bsb.storage.Chunk,
-          Tuple[np.ndarray, np.ndarray]]
+          Tuple[numpy.ndarray, numpy.ndarray]]
         """
         itr = CSIterator(self, direction, local_, global_)
         for dir in itr.get_dir_iter(direction):
@@ -360,7 +360,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :param global_: Global chunk
         :type global_: ~bsb.storage.Chunk
         :returns: The local and global connections locations
-        :rtype: Tuple[np.ndarray, np.ndarray]
+        :rtype: Tuple[numpy.ndarray, numpy.ndarray]
         """
         if handle is None:
             with self._engine._read():
@@ -390,7 +390,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
           (1 chunk id per connection) and the global connections locations. To identify a
           cell in the global connections, use the corresponding chunk id from the second
           return value.
-        :rtype: Tuple[np.ndarray, np.ndarray, np.ndarray]
+        :rtype: Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]
         """
         if handle is None:
             with self._engine._read():

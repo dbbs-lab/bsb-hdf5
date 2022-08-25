@@ -40,6 +40,7 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "bsb": ("https://bsb.readthedocs.io/en/latest/", None),
     "errr": ("https://errr.readthedocs.io/en/latest/", None),
+    "h5py": ("https://docs.h5py.org/en/latest/", None),
 }
 
 # Add any paths that contain templates here, relative to this directory.
