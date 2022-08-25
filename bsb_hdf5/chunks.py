@@ -132,7 +132,7 @@ class ChunkLoader:
 
     def _set_chunk_size(self, handle, size):
         fsize = handle.attrs.get("chunk_size", size)
-        if not np.allclose(fsize, size):
+        if not np.any(np.isnan(fsize)) and not np.allclose(fsize, size):
             raise Exception(f"Chunk size mismatch. File: {fsize}. Given: {size}")
         handle.attrs["chunk_size"] = size
 
