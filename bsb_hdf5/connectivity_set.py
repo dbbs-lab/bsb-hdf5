@@ -34,6 +34,9 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @classmethod
     def get_tags(cls, engine):
+        """
+        Returns all the connectivity tags in the network.
+        """
         with engine._read():
             with engine._handle("r") as h:
                 return list(h[_root].keys())
@@ -61,6 +64,19 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @staticmethod
     def exists(engine, tag, handle=None):
+        """
+        Checks whether a :class:`~.connectivity_set.ConnectivitySet` with the given tag
+        exists.
+
+        :param engine: Engine to use for the lookup.
+        :type engine: :class:`.HDF5Engine`
+        :param tag: Tag of the set to look for.
+        :type tag: str
+        :param handle: An open handle to use instead of opening one.
+        :type handle: :class:`h5py.File`
+        :returns: Whether the tag exists.
+        :rtype: bool
+        """
         check = lambda h: _root + tag in h
         if handle is not None:
             return check(handle)
@@ -71,6 +87,21 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @classmethod
     def require(cls, engine, pre_type, post_type, tag=None):
+        """
+        Get or create a :class:`~.connectivity_set.ConnectivitySet`.
+
+        :param engine: Engine to fetch/write the data.
+        :type engine: :class:`.HDF5Engine`
+        :param pre_type: Presynaptic cell type.
+        :type pre_type: :class:`~bsb.cell_types.CellType`
+        :param post_type: Postsynaptic cell type.
+        :type post_type: :class:`~bsb.cell_types.CellType`
+        :param tag: Tag to store the set under. Defaults to
+          ``{pre_type.name}_to_{post_type.name}``.
+        :type tag: str
+        :returns: Existing or new connectivity set.
+        :rtype: :class:`~.connectivity_set.ConnectivitySet`
+        """
         if tag is None:
             tag = f"{pre_type.name}_to_{post_type.name}"
         path = _root + tag
