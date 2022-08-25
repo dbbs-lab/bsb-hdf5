@@ -1,4 +1,9 @@
-from bsb.exceptions import *
+from bsb.exceptions import (
+    MissingMorphologyError,
+    DatasetExistsError,
+    DatasetNotFoundError,
+)
+from bsb.storage import Chunk
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
 from bsb.morphologies.selector import MorphologySelector
@@ -7,9 +12,19 @@ from .chunks import ChunkLoader, ChunkedProperty
 import numpy as np
 import itertools
 
-_pos_prop = lambda l: ChunkedProperty(l, "position", shape=(0, 3), dtype=float)
-_rot_prop = lambda l: ChunkedProperty(l, "rotation", shape=(0, 3), dtype=float)
-_morpho_prop = lambda l: ChunkedProperty(l, "morphology", shape=(0,), dtype=int)
+
+def _pos_prop(loader):
+    return ChunkedProperty(loader, "position", shape=(0, 3), dtype=float)
+
+
+def _rot_prop(loader):
+    return ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float)
+
+
+def _morpho_prop(loader):
+    return ChunkedProperty(loader, "morphology", shape=(0,), dtype=int)
+
+
 _root = "/placement/"
 
 
@@ -26,7 +41,8 @@ class _MapSelector(MorphologySelector):
         missing = set(self._names) - {m.get_meta()["name"] for m in loaders}
         if missing:
             raise MissingMorphologyError(
-                f"Morphology repository misses the following morphologies required by {self._ps.tag}: {', '.join(missing)}"
+                "Morphology repository misses the following morphologies required by"
+                + f" {self._ps.tag}: {', '.join(missing)}"
             )
 
     def pick(self, stored_morphology):
@@ -66,12 +82,12 @@ class PlacementSet(
         """
         tag = cell_type.name
         path = _root + tag
-        with engine._write() as fence:
+        with engine._write():
             with engine._handle("a") as h:
                 if path in h:
                     raise DatasetExistsError(f"PlacementSet '{tag}' already exists.")
                 g = h.create_group(path)
-                chunks = g.create_group("chunks")
+                g.create_group("chunks")
         return cls(engine, cell_type)
 
     @staticmethod
@@ -87,7 +103,7 @@ class PlacementSet(
         with engine._write():
             with engine._handle("a") as h:
                 g = h.require_group(path)
-                chunks = g.require_group("chunks")
+                g.require_group("chunks")
         return cls(engine, cell_type)
 
     def load_positions(self):
@@ -185,6 +201,10 @@ class PlacementSet(
           rotational or morphological data.
         :type count: int
         """
+        if not isinstance(chunk, Chunk):
+            chunk = Chunk(chunk, None)
+        if positions is not None:
+            positions = np.array(positions, copy=False)
         if count is not None:
             if not (positions is None and morphologies is None):
                 raise ValueError(

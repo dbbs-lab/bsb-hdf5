@@ -4,25 +4,26 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
-def get_config(file):
+def get_data_path(*paths):
     return os.path.abspath(
         os.path.join(
             os.path.dirname(__file__),
             "..",
             "data",
-            "configs",
-            file + (".json" if not file.endswith(".json") else ""),
+            *paths,
         )
     )
 
 
-def get_morphology(file):
-    return os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "data",
-            "morphologies",
-            file,
-        )
+def get_config_path(file):
+    return get_data_path(
+        "configs",
+        file + (".json" if not file.endswith(".json") else ""),
+    )
+
+
+def get_morphology_path(file):
+    return get_data_path(
+        "morphologies",
+        file,
     )

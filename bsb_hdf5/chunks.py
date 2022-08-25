@@ -9,7 +9,6 @@ ConnectivitySet) to organize :class:`.ChunkedProperty` and :class:`.ChunkedColle
 objects within them.
 """
 
-from .resource import Resource
 from bsb.storage._chunks import Chunk
 import numpy as np
 import contextlib
@@ -85,15 +84,16 @@ class ChunkLoader:
         """
         Add a chunk to read data from when loading properties/collections.
         """
-        self._chunks.add(chunk)
+        self._chunks.add(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
     def unload_chunk(self, chunk):
         """
         Remove a chunk to read data from when loading properties/collections.
         """
-        self._chunks.discard(chunk)
+        self._chunks.discard(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
     def set_chunks(self, chunks):
+        chunks = _to_chunklist(chunks)
         self._chunks = set(chunks)
 
     def clear_chunks(self):
@@ -131,13 +131,18 @@ class ChunkLoader:
                 prop.clear(chunk)
 
     def _set_chunk_size(self, handle, size):
-        fsize = handle.attrs.get("chunk_size", size)
-        if not np.allclose(fsize, size):
+        fsize = handle.attrs.get("chunk_size", np.full(3, np.nan))
+        if np.all(np.isnan(fsize)):
+            handle.attrs["chunk_size"] = size
+        elif not np.all(np.isnan(size)) and not np.allclose(fsize, size):
             raise Exception(f"Chunk size mismatch. File: {fsize}. Given: {size}")
-        handle.attrs["chunk_size"] = size
 
     def _get_chunk_size(self, handle):
         return handle.attrs["chunk_size"]
+
+
+def _to_chunklist(chunks):
+    return [c if isinstance(c, Chunk) else Chunk(c, None) for c in chunks]
 
 
 class ChunkedProperty:

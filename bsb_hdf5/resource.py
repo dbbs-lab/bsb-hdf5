@@ -46,7 +46,7 @@ class Resource:
     def get_attribute(self, name):
         attrs = self.attributes
         if name not in attrs:
-            raise AttributeMissingError(
+            raise AttributeError(
                 "Attribute '{}' not found in '{}'".format(name, self._path)
             )
         return attrs[name]
@@ -90,14 +90,14 @@ class Resource:
             with self._engine._handle("a") as f:
                 try:
                     d = f[self._path]
-                except:
+                except Exception:
                     shape = list(new_data.shape)
                     shape[0] = None
                     d = f.create_dataset(
                         self._path, data=new_data, dtype=dtype, maxshape=tuple(shape)
                     )
                 else:
-                    l = d.shape[0]
-                    l += len(new_data)
-                    d.resize(l, axis=0)
+                    len_ = d.shape[0]
+                    len_ += len(new_data)
+                    d.resize(len_, axis=0)
                     d[-len(new_data) :] = new_data

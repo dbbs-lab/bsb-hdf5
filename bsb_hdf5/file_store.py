@@ -1,6 +1,5 @@
 from bsb.storage.interfaces import FileStore as IFileStore
 from .resource import Resource
-from bsb.exceptions import *
 from uuid import uuid4
 import json
 import io
@@ -53,6 +52,12 @@ class FileStore(Resource, IFileStore):
         return id
 
     def load_active_config(self):
+        """
+        Load the active configuration stored inside of the storage.
+
+        :returns: The active configuration that is loaded when this storage object is.
+        :rtype: ~bsb.config.Configuration
+        """
         from bsb.config import Configuration
 
         cfg_id = self._active_config_id()
@@ -68,13 +73,20 @@ class FileStore(Resource, IFileStore):
             return cfg
 
     def store_active_config(self, config):
+        """
+        Set the active configuration for this network.
+
+        :param config: The active configuration that will be loaded when this storage
+          object is.
+        :type config: ~bsb.config.Configuration
+        """
         id = self._active_config_id()
-        self._engine.comm.Barrier()
-        if id is not None and self._engine.comm.Get_rank() == 0:
+        self._engine.comm.barrier()
+        if id is not None and self._engine.comm.get_rank() == 0:
             self.remove(id)
         config._meta["active_config"] = True
         active_id = None
-        if self._engine.comm.Get_rank() == 0:
+        if self._engine.comm.get_rank() == 0:
             meta = {k: v for k, v in config._meta.items() if v is not None}
             active_id = self.store(json.dumps(config.__tree__()), meta)
         return self._engine.comm.bcast(active_id, root=0)

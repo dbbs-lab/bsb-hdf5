@@ -1,16 +1,22 @@
-import setuptools, sys, os
+import setuptools
+import os
 
-with open(os.path.join(os.path.dirname(__file__), "bsb_hdf5", "__init__.py"), "r") as f:
+_findver = "__version__ = "
+_rootpath = os.path.join(os.path.dirname(__file__), "bsb_hdf5", "__init__.py")
+with open(_rootpath, "r") as f:
     for line in f:
         if "__version__ = " in line:
-            exec(line.strip())
+            f = line.find(_findver)
+            __version__ = eval(line[line.find(_findver) + len(_findver) :])
             break
+    else:
+        raise Exception(f"No `__version__` found in '{_rootpath}'.")
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 requires = [
-    "bsb~=4.0.0a29",
+    "bsb~=4.0.0a35",
     "shortuuid",
 ]
 
@@ -42,5 +48,5 @@ setuptools.setup(
         "Documentation": "https://bsb-hdf5.readthedocs.io/",
         "Source Code": "https://github.com/dbbs-lab/bsb-hdf5/",
     },
-    extras_require={},
+    extras_require={"dev": ["sphinx", "sphinxemoji", "furo", "sphinx_design"]},
 )
