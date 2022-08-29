@@ -7,22 +7,11 @@ from bsb.storage import Chunk
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
 from bsb.morphologies.selector import MorphologySelector
-from .resource import Resource
-from .chunks import ChunkLoader, ChunkedProperty
+from .resource import Resource, handles_handles
+from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
 import numpy as np
 import itertools
-
-
-def _pos_prop(loader):
-    return ChunkedProperty(loader, "position", shape=(0, 3), dtype=float)
-
-
-def _rot_prop(loader):
-    return ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float)
-
-
-def _morpho_prop(loader):
-    return ChunkedProperty(loader, "morphology", shape=(0,), dtype=int)
+import operator
 
 
 _root = "/placement/"
@@ -54,8 +43,15 @@ class PlacementSet(
     Resource,
     ChunkLoader,
     IPlacementSet,
-    properties=(_pos_prop, _rot_prop, _morpho_prop),
-    collections=("labels", "additional"),
+    properties=(
+        lambda loader: ChunkedProperty(loader, "position", shape=(0, 3), dtype=float),
+        lambda loader: ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float),
+        lambda loader: ChunkedProperty(loader, "morphology", shape=(0,), dtype=int),
+    ),
+    collections=(
+        lambda loader: ChunkedCollection(loader, "labels", shape=(0,), dtype=bool),
+        lambda loader: ChunkedCollection(loader, "additional", shape=(0,), dtype=float),
+    ),
 ):
     """
     Fetches placement data from storage.
@@ -71,6 +67,7 @@ class PlacementSet(
         super().__init__(engine, _root + tag)
         IPlacementSet.__init__(self, engine, cell_type)
         ChunkLoader.__init__(self)
+        self._labels = None
         if not self.exists(engine, cell_type):
             raise DatasetNotFoundError("PlacementSet '{}' does not exist".format(tag))
 
@@ -114,11 +111,17 @@ class PlacementSet(
            cell type.
         """
         try:
-            return self._position_chunks.load()
+            positions = self._position_chunks.load()
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
                 "No position information for the '{}' placement set.".format(self.tag)
             )
+        else:
+            if self._labels:
+                mask = self.get_label_mask(self._labels)
+                return positions[mask]
+            else:
+                return positions
 
     def load_rotations(self):
         """
@@ -256,3 +259,61 @@ class PlacementSet(
                     start_pos = dset.shape[0]
                     dset.resize(start_pos + len(data), axis=0)
                     dset[start_pos:] = data
+
+    @handles_handles("a")
+    def label(self, mask, labels, handle=None):
+        cells = np.array(mask, copy=False)
+        if cells.dtype != bool or len(cells) != len(self):
+            return self.label_a_few(cells, labels)
+        # Demultiplex the mask by slicing it per chunk. _lendemux also sets chunk context
+        # to current chunk
+        for chunk, slice_ in self._lendemux():
+            block = cells[slice_]
+            for label in labels:
+                to_label = block | self._labels_chunks.load(
+                    key=label, pad=len(block), handle=handle
+                )
+                self._labels_chunks.overwrite(chunk, to_label, key=label, handle=handle)
+
+    @handles_handles("a")
+    def label_a_few(self, cells, labels, handle=None):
+        # Demultiplex the cells per chunk. _demux also sets chunk context to current chunk
+        for chunk, block in self._demux(cells):
+            mask = np.zeros(len(self), dtype=bool)
+            mask[block] = True
+            for label in labels:
+                to_label = mask | self._labels_chunks.load(
+                    key=label, pad=len(mask), handle=handle
+                )
+                self._labels_chunks.overwrite(chunk, to_label, key=label, handle=handle)
+
+    def set_label_filter(self, labels):
+        self._labels = labels
+
+    def get_label_mask(self, labels, operator=operator.or_):
+        mask = np.zeros(len(self), dtype=bool)
+        for label in labels:
+            mask = operator(mask, self._labels_chunks.read(pad_empty=True))
+
+    def _lendemux(self):
+        """
+        Watch out, this function sets the chunk context for as long as it iterates.
+        """
+        ctr = 0
+        for chunk in self.get_loaded_chunks():
+            with self.chunk_context(chunk):
+                len_ = len(self)
+                yield (chunk, slice(ctr, ctr := ctr + len_))
+
+    def _demux(self, ids):
+        """
+        Watch out, this function sets the chunk context for as long as it iterates.
+        """
+        for chunk in self.get_loaded_chunks():
+            with self.chunk_context(chunk):
+                ln = len(self)
+                idx = ids < ln
+                block = ids[idx]
+                yield chunk, block
+                ids = ids[~idx]
+                ids -= ln

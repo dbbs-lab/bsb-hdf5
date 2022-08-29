@@ -1,5 +1,34 @@
 import numpy as np
 import h5py
+import inspect
+import functools
+
+
+def handles_handles(handle_type, handler=lambda self: self._engine):
+    lock_f = {"r": lambda eng: eng._read, "a": lambda eng: eng._write}.get(handle_type)
+
+    def decorator(f):
+        sig = inspect.signature(f)
+        if "handle" not in sig.parameters:
+            raise ValueError("Needs handle to be handled by handles_handles. Clearly.")
+
+        @functools.wraps(f)
+        def decorated(self, *args, handle=None, **kwargs):
+            engine = handler(self)
+            lock = lock_f(engine)
+            print("F ARGS", f, sig, args, kwargs)
+            bound = sig.bind(self, *args, **kwargs)
+            if bound.arguments.get("handle", None) is None:
+                with lock():
+                    with engine._handle(handle_type) as handle:
+                        bound.arguments["handle"] = handle
+                        return f(*bound.args, **bound.kwargs)
+            else:
+                return f(*bound.args, **bound.kwargs)
+
+        return decorated
+
+    return decorator
 
 
 class Resource:
