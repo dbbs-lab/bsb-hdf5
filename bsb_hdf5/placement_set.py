@@ -290,7 +290,12 @@ class PlacementSet(
     def set_label_filter(self, labels):
         self._labels = labels
 
-    def get_label_mask(self, labels, operator=operator.or_):
+    def label_mask(self, labels, operator=operator.or_):
+        mask = np.zeros(len(self), dtype=bool)
+        for label in labels:
+            mask = operator(mask, self._labels_chunks.read(pad_empty=True))
+
+    def labelled(self, labels, operator=operator.or_):
         mask = np.zeros(len(self), dtype=bool)
         for label in labels:
             mask = operator(mask, self._labels_chunks.read(pad_empty=True))

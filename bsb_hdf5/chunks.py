@@ -241,22 +241,12 @@ class ChunkedProperty:
     @handles_handles("a", lambda self: self.loader._engine)
     def clear(self, chunk, key=None, handle=None):
         key = key or self.name
-        print("require", self.loader.require_chunk(chunk, handle))
         chunk_group = handle[self._chunk_path(chunk)]
-        print("Group?", chunk_group)
         if key not in chunk_group:
-            # print("test", chunk_group.create_dataset(key, data=[]))
-            print(
-                key,
-                self.shape,
-                np.empty(self.shape, dtype=self.dtype),
-                self.maxshape,
-                self.dtype,
-            )
             chunk_group.create_dataset(
                 key,
                 self.shape,
-                data=np.empty(self.shape),
+                data=np.empty(self.shape, dtype=self.dtype),
                 maxshape=self.maxshape,
                 dtype=self.dtype,
             )

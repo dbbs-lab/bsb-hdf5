@@ -16,7 +16,6 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
         def decorated(self, *args, handle=None, **kwargs):
             engine = handler(self)
             lock = lock_f(engine)
-            print("F ARGS", f, sig, args, kwargs)
             bound = sig.bind(self, *args, **kwargs)
             if bound.arguments.get("handle", None) is None:
                 with lock():
