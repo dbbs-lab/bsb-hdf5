@@ -4,13 +4,20 @@ import inspect
 import functools
 
 
+# Semantic marker for things that get injected
+INJECTED = None
+
+
+# Decorator to inject handles
 def handles_handles(handle_type, handler=lambda self: self._engine):
     lock_f = {"r": lambda eng: eng._read, "a": lambda eng: eng._write}.get(handle_type)
 
     def decorator(f):
         sig = inspect.signature(f)
         if "handle" not in sig.parameters:
-            raise ValueError("Needs handle to be handled by handles_handles. Clearly.")
+            raise ValueError(
+                f"`{f.__module__}.{f.__name__}` needs handle to be handled by handles_handles. Clearly."
+            )
 
         @functools.wraps(f)
         def decorated(self, *args, handle=None, **kwargs):

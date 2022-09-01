@@ -4,14 +4,16 @@ from bsb.exceptions import (
     DatasetNotFoundError,
 )
 from bsb.storage import Chunk
+from bsb._encoding import EncodedLabels
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
 from bsb.morphologies.selector import MorphologySelector
-from .resource import Resource, handles_handles
+from .resource import Resource, handles_handles, INJECTED
 from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
 import numpy as np
 import itertools
 import operator
+import json
 
 
 _root = "/placement/"
@@ -47,9 +49,11 @@ class PlacementSet(
         lambda loader: ChunkedProperty(loader, "position", shape=(0, 3), dtype=float),
         lambda loader: ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float),
         lambda loader: ChunkedProperty(loader, "morphology", shape=(0,), dtype=int),
+        lambda loader: ChunkedProperty(
+            loader, "labels", shape=(0,), dtype=int, extract=encode_labels
+        ),
     ),
     collections=(
-        lambda loader: ChunkedCollection(loader, "labels", shape=(0,), dtype=bool),
         lambda loader: ChunkedCollection(loader, "additional", shape=(0,), dtype=float),
     ),
 ):
@@ -64,7 +68,7 @@ class PlacementSet(
 
     def __init__(self, engine, cell_type):
         tag = cell_type.name
-        super().__init__(engine, _root + tag)
+        Resource.__init__(self, engine, _root + tag)
         IPlacementSet.__init__(self, engine, cell_type)
         ChunkLoader.__init__(self)
         self._labels = None
@@ -114,7 +118,7 @@ class PlacementSet(
             positions = self._position_chunks.load()
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
-                "No position information for the '{}' placement set.".format(self.tag)
+                f"No position information for the '{self.tag}' placement set."
             )
         else:
             if self._labels:
@@ -151,6 +155,11 @@ class PlacementSet(
             raise DatasetNotFoundError(
                 "No morphology information for the '{}' placement set.".format(self.tag)
             )
+
+    def get_label_mask(self, labels):
+        mask = np.zeros(len(self), dtype=bool)
+        for label in labels:
+            mask |= self.lab
 
     def _get_morphology_loaders(self):
         loaded_names = set()
@@ -261,44 +270,59 @@ class PlacementSet(
                     dset[start_pos:] = data
 
     @handles_handles("a")
-    def label(self, mask, labels, handle=None):
+    def label_by_mask(self, mask, labels, handle=INJECTED):
         cells = np.array(mask, copy=False)
         if cells.dtype != bool or len(cells) != len(self):
-            return self.label_a_few(cells, labels)
-        # Demultiplex the mask by slicing it per chunk. _lendemux also sets chunk context
-        # to current chunk
-        for chunk, slice_ in self._lendemux():
-            block = cells[slice_]
-            for label in labels:
-                to_label = block | self._labels_chunks.load(
-                    key=label, pad=len(block), handle=handle
-                )
-                self._labels_chunks.overwrite(chunk, to_label, key=label, handle=handle)
+            raise Exception("Mask doesn't fit data.")
+        self._write_labels(
+            labels,
+            handle,
+            lambda: self._lendemux(),
+            lambda s: cells[s],
+        )
 
     @handles_handles("a")
-    def label_a_few(self, cells, labels, handle=None):
+    def label(self, cells, labels, handle=INJECTED):
+        cells = np.array(cells, copy=False)
+        self._write_labels(
+            labels,
+            handle,
+            lambda: self._demux(cells),
+            lambda x: x,
+        )
+
+    def _write_labels(self, labels, handle, demux_f, data_f):
+        label_reader = self._labels_chunks.get_chunk_reader(
+            handle, False, pad_by="position"
+        )
+        updated_labels = None
         # Demultiplex the cells per chunk. _demux also sets chunk context to current chunk
-        for chunk, block in self._demux(cells):
-            mask = np.zeros(len(self), dtype=bool)
-            mask[block] = True
-            for label in labels:
-                to_label = mask | self._labels_chunks.load(
-                    key=label, pad=len(mask), handle=handle
-                )
-                self._labels_chunks.overwrite(chunk, to_label, key=label, handle=handle)
+        for chunk, block in demux_f():
+            enc_labels = label_reader(chunk)
+            if updated_labels:
+                enc_labels.labels = updated_labels
+            else:
+                updated_labels = enc_labels.labels
+            enc_labels.label(labels, data_f(block))
+            self._labels_chunks.overwrite(chunk, enc_labels, handle=handle)
+        if updated_labels is not None:
+            handle[self._path].attrs["labelsets"] = json.dumps(
+                updated_labels, default=list
+            )
 
     def set_label_filter(self, labels):
         self._labels = labels
 
-    def label_mask(self, labels, operator=operator.or_):
-        mask = np.zeros(len(self), dtype=bool)
-        for label in labels:
-            mask = operator(mask, self._labels_chunks.read(pad_empty=True))
+    @handles_handles("r")
+    def get_label_mask(self, labels, handle=INJECTED):
+        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(
+            *labels
+        )
 
-    def labelled(self, labels, operator=operator.or_):
-        mask = np.zeros(len(self), dtype=bool)
-        for label in labels:
-            mask = operator(mask, self._labels_chunks.read(pad_empty=True))
+    @handles_handles("r")
+    def get_labelled(self, labels, handle=INJECTED):
+        mask = self.get_label_mask(labels, handle=handle)
+        return np.nonzero(mask)[0]
 
     def _lendemux(self):
         """
@@ -322,3 +346,13 @@ class PlacementSet(
                 yield chunk, block
                 ids = ids[~idx]
                 ids -= ln
+
+
+def encode_labels(data, ds):
+    if ds is None:
+        return EncodedLabels.none(len(data))
+    else:
+        ps_group = ds.parent.parent.parent
+        serialized = json.dumps(EncodedLabels.none(1).labels, default=list)
+        labels = json.loads(ps_group.attrs.get("labelsets", serialized))
+        return EncodedLabels(shape=data.shape, buffer=data, labels=labels)

@@ -12,7 +12,7 @@ objects within them.
 from bsb.storage._chunks import Chunk
 import numpy as np
 import contextlib
-from .resource import handles_handles
+from .resource import handles_handles, INJECTED
 
 
 class ChunkLoader:
@@ -107,7 +107,7 @@ class ChunkLoader:
         self._chunks = set()
 
     @handles_handles("a")
-    def require_chunk(self, chunk, handle=None):
+    def require_chunk(self, chunk, handle=INJECTED):
         """
         Create a chunk if it doesn't exist yet, or do nothing.
         """
@@ -119,9 +119,7 @@ class ChunkLoader:
                 chunk_group.create_dataset(
                     f"{path}/{p.name}", p.shape, maxshape=p.maxshape, dtype=p.dtype
                 )
-            print("Creating colls!", path)
             for c in self._collections:
-                print("Creating coll!", path + f"/{c.collection}")
                 chunk_group.create_group(path + f"/{c.collection}")
 
     def clear(self, chunks=None):
@@ -172,47 +170,49 @@ class ChunkedProperty:
         self.maxshape = tuple(maxshape)
 
     @handles_handles("r", lambda self: self.loader._engine)
-    def load(self, raw=False, key=None, pad=0, handle=None):
-        key = key or self.name
+    def load(self, raw=False, key=None, pad_by=None, handle=INJECTED):
         if self.loader._chunks:
             chunks = self.loader._chunks
         else:
             chunks = self.loader.get_all_chunks()
-        reader = self._chunk_reader(handle, raw, pad, key)
-        chunk_loader = map(reader, chunks)
+        reader = self.get_chunk_reader(handle, raw, key, pad_by=pad_by)
         # Concatenate all non-empty chunks together
-        chunked_data = tuple(c for c in chunk_loader if c.size)
+        chunked_data = tuple(data for c in chunks if (data := reader(c)).size)
         if not chunked_data:
             return np.empty(self.shape)
+        # Allow custom arrays with concatenate methods to concatenate themselves.
+        if hasattr(chunked_data[0].__class__, "concatenate"):
+            return chunked_data[0].__class__.concatenate(*chunked_data)
         return np.concatenate(chunked_data)
 
-    def _chunk_reader(self, handle, raw, pad, key):
+    def get_chunk_reader(self, handle, raw, key=None, pad_by=None):
         """
         Create a chunk reader that either returns the raw data or extracts it.
         """
+        key = self.name if key is None else key
 
-        def read_chunk(chunk):
+        def read_chunk(chunk, pad=0):
+            if pad_by:
+                pad = len(handle[self._chunk_path(chunk, pad_by)])
             try:
-                print("CP NO KEY", self._chunk_path(chunk))
-                print("CP KEY", self._chunk_path(chunk, key))
                 chunk_group = handle[self._chunk_path(chunk, key)]
             except KeyError:
-                return np.zeros((pad, *self.shape[1:]), dtype=self.dtype)
+                chunk_group = None
+                data = np.zeros((pad, *self.shape[1:]), dtype=self.dtype)
             else:
-                print(chunk_group)
                 data = chunk_group[()]
-                if not raw and self.extract is not None:
-                    data = np.array(self.extract(data), copy=False)
                 if len(data) < pad:
                     fillshape = (pad - len(data), *self.shape[1:])
-                    return np.concat((data, np.zeros(fillshape, dtype=self.dtype)))
-                return data
+                    data = np.concatenate((data, np.zeros(fillshape, dtype=self.dtype)))
+            if not (raw or self.extract is None):
+                data = self.extract(data, chunk_group)
+            return data
 
         # Return the created function
         return read_chunk
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def append(self, chunk, data, key=None, handle=None):
+    def append(self, chunk, data, key=None, handle=INJECTED):
         """
         Append data to a property chunk. Will create it if it doesn't exist.
 
@@ -239,7 +239,7 @@ class ChunkedProperty:
             dset[start_pos:] = data
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def clear(self, chunk, key=None, handle=None):
+    def clear(self, chunk, key=None, handle=INJECTED):
         key = key or self.name
         chunk_group = handle[self._chunk_path(chunk)]
         if key not in chunk_group:
@@ -255,7 +255,7 @@ class ChunkedProperty:
             dset.resize(0, axis=0)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def overwrite(self, chunk, data, key=None, handle=None):
+    def overwrite(self, chunk, data, key=None, handle=INJECTED):
         self.clear(chunk, key, handle)
         self.append(chunk, data, key, handle)
 
@@ -275,13 +275,18 @@ class ChunkedCollection(ChunkedProperty):
         super().__init__(loader, None, shape, dtype, insert, extract, collection)
 
     @handles_handles("r", lambda self: self.loader._engine)
-    def load(self, key, handle=None, **kwargs):
+    def load(self, key, handle=INJECTED, **kwargs):
         return super().load(key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def append(self, chunk, data, key, handle=None, **kwargs):
+    def append(self, chunk, data, key, handle=INJECTED, **kwargs):
         return super().append(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def overwrite(self, chunk, data, key, handle=None, **kwargs):
+    def overwrite(self, chunk, data, key, handle=INJECTED, **kwargs):
         return super().overwrite(chunk, data, key=key, handle=handle, **kwargs)
+
+    @handles_handles("a", lambda self: self.loader._engine)
+    def clear(self, chunk, handle=INJECTED):
+        del handle[self._chunk_path(chunk)]
+        handle.create_group(self._chunk_path(chunk))
