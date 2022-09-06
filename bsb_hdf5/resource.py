@@ -5,7 +5,7 @@ import functools
 
 
 # Semantic marker for things that get injected
-INJECTED = None
+HANDLED = None
 
 
 # Decorator to inject handles
