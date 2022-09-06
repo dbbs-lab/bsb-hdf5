@@ -12,7 +12,7 @@ objects within them.
 from bsb.storage._chunks import Chunk
 import numpy as np
 import contextlib
-from .resource import handles_handles, INJECTED
+from .resource import handles_handles, HANDLED
 
 
 class ChunkLoader:
@@ -107,7 +107,7 @@ class ChunkLoader:
         self._chunks = set()
 
     @handles_handles("a")
-    def require_chunk(self, chunk, handle=INJECTED):
+    def require_chunk(self, chunk, handle=HANDLED):
         """
         Create a chunk if it doesn't exist yet, or do nothing.
         """
@@ -170,7 +170,7 @@ class ChunkedProperty:
         self.maxshape = tuple(maxshape)
 
     @handles_handles("r", lambda self: self.loader._engine)
-    def load(self, raw=False, key=None, pad_by=None, handle=INJECTED):
+    def load(self, raw=False, key=None, pad_by=None, handle=HANDLED):
         if self.loader._chunks:
             chunks = self.loader._chunks
         else:
@@ -218,7 +218,7 @@ class ChunkedProperty:
         return read_chunk
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def append(self, chunk, data, key=None, handle=INJECTED):
+    def append(self, chunk, data, key=None, handle=HANDLED):
         """
         Append data to a property chunk. Will create it if it doesn't exist.
 
@@ -245,7 +245,7 @@ class ChunkedProperty:
             dset[start_pos:] = data
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def clear(self, chunk, key=None, handle=INJECTED):
+    def clear(self, chunk, key=None, handle=HANDLED):
         key = key or self.name
         chunk_group = handle[self._chunk_path(chunk)]
         if key not in chunk_group:
@@ -261,7 +261,7 @@ class ChunkedProperty:
             dset.resize(0, axis=0)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def overwrite(self, chunk, data, key=None, handle=INJECTED):
+    def overwrite(self, chunk, data, key=None, handle=HANDLED):
         self.clear(chunk, key, handle)
         self.append(chunk, data, key, handle)
 
@@ -281,18 +281,18 @@ class ChunkedCollection(ChunkedProperty):
         super().__init__(loader, None, shape, dtype, insert, extract, collection)
 
     @handles_handles("r", lambda self: self.loader._engine)
-    def load(self, key, handle=INJECTED, **kwargs):
+    def load(self, key, handle=HANDLED, **kwargs):
         return super().load(key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def append(self, chunk, data, key, handle=INJECTED, **kwargs):
+    def append(self, chunk, data, key, handle=HANDLED, **kwargs):
         return super().append(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def overwrite(self, chunk, data, key, handle=INJECTED, **kwargs):
+    def overwrite(self, chunk, data, key, handle=HANDLED, **kwargs):
         return super().overwrite(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def clear(self, chunk, handle=INJECTED):
+    def clear(self, chunk, handle=HANDLED):
         del handle[self._chunk_path(chunk)]
         handle.create_group(self._chunk_path(chunk))
