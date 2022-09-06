@@ -377,7 +377,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return (local_grp["local_locs"][()], col, global_locs)
 
     @handles_handles("r")
-    def load_connections(self, direction, handle=HANDLED):
+    def load_connections(self, direction="out", handle=HANDLED):
         chunks = self.get_local_chunks(direction, handle=handle)
         locals = []
         cids = []

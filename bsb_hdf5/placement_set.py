@@ -194,7 +194,6 @@ class PlacementSet(
 
     def __len__(self):
         if self._labels:
-            print("are we labelled?", self._labels, self._labels_chunks.load())
             return np.sum(self._labels_chunks.load().get_mask(self._labels))
         else:
             return len(self._position_chunks.load())
@@ -327,7 +326,6 @@ class PlacementSet(
             )
 
     def set_label_filter(self, labels):
-        print("setting labels to", labels)
         self._labels = labels
 
     @handles_handles("r")
