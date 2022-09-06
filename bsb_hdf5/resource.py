@@ -23,7 +23,15 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
         def decorated(self, *args, handle=None, **kwargs):
             engine = handler(self)
             lock = lock_f(engine)
-            bound = sig.bind(self, *args, **kwargs)
+            try:
+                bound = sig.bind(self, *args, **kwargs)
+            except TypeError:
+                # Re-call the actual function, for better TypeError
+                try:
+                    f(self, *args, **kwargs)
+                except TypeError as e:
+                    # Re-raise the exception from None for better stack trace
+                    raise e from None
             if bound.arguments.get("handle", None) is None:
                 with lock():
                     with engine._handle(handle_type) as handle:

@@ -274,10 +274,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
         .. code-block:: python
 
-          for dir, itr in self.nested_iter_connections():
-              for lchunk, itr in itr:
+          for dir, local_itr in self.nested_iter_connections():
+              for lchunk, global_itr in local_itr:
                   print("I can do something at the start of a new local chunk")
-                  for gchunk, data in itr:
+                  for gchunk, data in global_itr:
                       print(f"Nested {dir} block between {lchunk} and {gchunk}")
                   print("Or right before we move to the next local chunk")
 
