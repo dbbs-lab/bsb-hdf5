@@ -176,8 +176,9 @@ class ChunkedProperty:
         else:
             chunks = self.loader.get_all_chunks()
         reader = self.get_chunk_reader(handle, raw, key, pad_by=pad_by)
-        # Concatenate all non-empty chunks together
+        # Read and collect all non empty chunks
         chunked_data = tuple(data for c in chunks if (data := reader(c)).size)
+        # No data? Return empty
         if not chunked_data:
             data = np.empty(self.shape)
             if self.extract and not raw:
