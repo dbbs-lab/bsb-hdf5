@@ -185,9 +185,10 @@ class ChunkedProperty:
             else:
                 return data
         # Allow custom arrays with concatenate methods to concatenate themselves.
-        if hasattr(chunked_data[0].__class__, "concatenate"):
-            return chunked_data[0].__class__.concatenate(*chunked_data)
-        return np.concatenate(chunked_data)
+        if concatenator := getattr(chunked_data[0].__class__, "concatenate", None):
+            return concatenator(*chunked_data)
+        else:
+            return np.concatenate(chunked_data)
 
     def get_chunk_reader(self, handle, raw, key=None, pad_by=None):
         """
