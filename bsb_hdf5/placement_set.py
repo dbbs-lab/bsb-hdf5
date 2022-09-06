@@ -8,7 +8,7 @@ from bsb._encoding import EncodedLabels
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
 from bsb.morphologies.selector import MorphologySelector
-from .resource import Resource, handles_handles, INJECTED
+from .resource import Resource, handles_handles, HANDLED
 from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
 import numpy as np
 import itertools
@@ -107,7 +107,8 @@ class PlacementSet(
                 g.require_group("chunks")
         return cls(engine, cell_type)
 
-    def load_positions(self):
+    @handles_handles("r")
+    def load_positions(self, handle=HANDLED):
         """
         Load the cell positions.
 
@@ -115,19 +116,20 @@ class PlacementSet(
            cell type.
         """
         try:
-            positions = self._position_chunks.load()
+            positions = self._position_chunks.load(handle=handle)
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
                 f"No position information for the '{self.tag}' placement set."
             )
         else:
             if self._labels:
-                mask = self.get_label_mask(self._labels)
+                mask = self.get_label_mask(self._labels, handle=handle)
                 return positions[mask]
             else:
                 return positions
 
-    def load_rotations(self):
+    @handles_handles("r")
+    def load_rotations(self, handle=HANDLED):
         """
         Load the cell rotations.
 
@@ -135,26 +137,33 @@ class PlacementSet(
            cell type.
         """
         try:
-            return RotationSet(self._rotation_chunks.load())
+            data = self._rotation_chunks.load(handle=handle)
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
-                "No rotation information for the '{}' placement set.".format(self.tag)
+                f"No rotation information for the '{self.tag}' placement set."
             )
+        if self._labels:
+            mask = self.get_label_mask(self._labels, handle=handle)
+            data = data[mask]
+        return RotationSet(data)
 
-    def load_morphologies(self):
+    @handles_handles("r")
+    def load_morphologies(self, handle=HANDLED):
         """
         Load the cell morphologies.
 
         :raises: DatasetNotFoundError when the morphology data is not found.
         """
         try:
-            return MorphologySet(
-                self._get_morphology_loaders(), self._morphology_chunks.load()
-            )
+            data = self._morphology_chunks.load(handle=handle)
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
-                "No morphology information for the '{}' placement set.".format(self.tag)
+                f"No morphology information for the '{self.tag}' placement set."
             )
+        if self._labels:
+            mask = self.get_label_mask(self._labels, handle=handle)
+            data = data[mask]
+        return MorphologySet(self._get_morphology_loaders(handle=handle), data)
 
     def get_label_mask(self, labels):
         mask = np.zeros(len(self), dtype=bool)
