@@ -165,30 +165,26 @@ class PlacementSet(
             data = data[mask]
         return MorphologySet(self._get_morphology_loaders(handle=handle), data)
 
-    def get_label_mask(self, labels):
-        mask = np.zeros(len(self), dtype=bool)
-        for label in labels:
-            mask |= self.lab
+    def get_label_mask(self, labels, handle=None):
+        return self._labels_chunks.load(pad_by="position", handle=handle).get_mask(labels)
 
-    def _get_morphology_loaders(self):
+    @handles_handles("r")
+    def _get_morphology_loaders(self, handle=HANDLED):
         loaded_names = set()
         stor_mor = []
-        with self._engine._read():
-            with self._engine._handle("r") as f:
-                for chunk in self.get_loaded_chunks():
-                    path = self.get_chunk_path(chunk)
-                    _map = f[path].attrs.get("morphology_loaders", [])
-                    cmlist = self._engine.morphologies.select(_MapSelector(self, _map))
-                    stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
-                    loaded_names.update(m.name for m in cmlist)
+        for chunk in self.get_loaded_chunks():
+            path = self.get_chunk_path(chunk)
+            _map = handle[path].attrs.get("morphology_loaders", [])
+            cmlist = self._engine.morphologies.select(_MapSelector(self, _map))
+            stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
+            loaded_names.update(m.name for m in cmlist)
         return stor_mor
 
-    def _set_morphology_loaders(self, map):
-        with self._engine._write():
-            with self._engine._handle("a") as f:
-                for chunk in self.get_loaded_chunks():
-                    path = self.get_chunk_path(chunk)
-                    f[path].attrs["morphology_loaders"] = map
+    @handles_handles("a")
+    def _set_morphology_loaders(self, map, handle=HANDLED):
+        for chunk in self.get_loaded_chunks():
+            path = self.get_chunk_path(chunk)
+            handle[path].attrs["morphology_loaders"] = map
 
     def __iter__(self):
         return itertools.zip_longest(
@@ -197,7 +193,11 @@ class PlacementSet(
         )
 
     def __len__(self):
-        return len(self._position_chunks.load())
+        if self._labels:
+            print("are we labelled?", self._labels, self._labels_chunks.load())
+            return np.sum(self._labels_chunks.load().get_mask(self._labels))
+        else:
+            return len(self._position_chunks.load())
 
     def append_data(
         self,
@@ -279,10 +279,10 @@ class PlacementSet(
                     dset[start_pos:] = data
 
     @handles_handles("a")
-    def label_by_mask(self, mask, labels, handle=INJECTED):
+    def label_by_mask(self, mask, labels, handle=HANDLED):
         cells = np.array(mask, copy=False)
         if cells.dtype != bool or len(cells) != len(self):
-            raise Exception("Mask doesn't fit data.")
+            raise LabellingException("Mask doesn't fit data.")
         self._write_labels(
             labels,
             handle,
@@ -291,8 +291,15 @@ class PlacementSet(
         )
 
     @handles_handles("a")
-    def label(self, cells, labels, handle=INJECTED):
+    def label(self, labels, cells, handle=HANDLED):
         cells = np.array(cells, copy=False)
+        len_ = len(self)
+        oob = cells > len_
+        if np.any(oob):
+            oob_idx = cells[oob]
+            raise LabellingException(
+                f"Cell labels {oob_idx} out of range for placement set with size {len_}."
+            )
         self._write_labels(
             labels,
             handle,
@@ -320,16 +327,15 @@ class PlacementSet(
             )
 
     def set_label_filter(self, labels):
+        print("setting labels to", labels)
         self._labels = labels
 
     @handles_handles("r")
-    def get_label_mask(self, labels, handle=INJECTED):
-        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(
-            *labels
-        )
+    def get_label_mask(self, labels, handle=HANDLED):
+        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(labels)
 
     @handles_handles("r")
-    def get_labelled(self, labels, handle=INJECTED):
+    def get_labelled(self, labels, handle=HANDLED):
         mask = self.get_label_mask(labels, handle=handle)
         return np.nonzero(mask)[0]
 
@@ -365,3 +371,7 @@ def encode_labels(data, ds):
         serialized = json.dumps(EncodedLabels.none(1).labels, default=list)
         labels = json.loads(ps_group.attrs.get("labelsets", serialized))
         return EncodedLabels(shape=data.shape, buffer=data, labels=labels)
+
+
+class LabellingException(Exception):
+    pass
