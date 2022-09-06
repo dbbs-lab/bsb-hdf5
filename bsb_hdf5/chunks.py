@@ -179,7 +179,11 @@ class ChunkedProperty:
         # Concatenate all non-empty chunks together
         chunked_data = tuple(data for c in chunks if (data := reader(c)).size)
         if not chunked_data:
-            return np.empty(self.shape)
+            data = np.empty(self.shape)
+            if self.extract and not raw:
+                return self.extract(data, None)
+            else:
+                return data
         # Allow custom arrays with concatenate methods to concatenate themselves.
         if hasattr(chunked_data[0].__class__, "concatenate"):
             return chunked_data[0].__class__.concatenate(*chunked_data)
