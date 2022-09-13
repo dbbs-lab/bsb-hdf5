@@ -146,32 +146,31 @@ class ConnectivitySet(Resource, IConnectivitySet):
             self.chunk_connect(*data, handle=handle)
 
     def _demux(self, pre, post, src_locs, dst_locs):
-        dst_chunks = post.get_loaded_chunks()
+        src_chunks = pre.get_loaded_chunks()
         lns = []
-        for dst in iter(dst_chunks):
-            with post.chunk_context(dst):
-                lns.append(len(post))
-        # Iterate over each source chunk
-        for src in pre.get_loaded_chunks():
-            # Count the number of cells
+        for src in iter(src_chunks):
             with pre.chunk_context(src):
-                ln = len(pre)
-            src_idx = src_locs[:, 0] < ln
-            src_block = src_locs[src_idx]
-            dst_block = dst_locs[src_idx]
-            if len(dst_chunks) == 1:
-                block_idx = np.lexsort((dst_block[:, 0], src_block[:, 0]))
-                yield src, dst, src_block[block_idx], dst_block[block_idx]
+                lns.append(len(pre))
+        # Iterate over each source chunk
+        for dst in post.get_loaded_chunks():
+            # Count the number of cells
+            with post.chunk_context(dst):
+                ln = len(post)
+            dst_idx = dst_locs[:, 0] < ln
+            dst_block = dst_locs[dst_idx]
+            src_block = src_locs[dst_idx]
+            if len(src_chunks) == 1:
+                block_idx = np.lexsort((src_block[:, 0], dst_block[:, 0]))
+                yield dst, src, dst_block[block_idx], src_block[block_idx]
             else:
-                dctr = 0
-                for dst, dln in zip(iter(dst_chunks), lns):
-                    block_idx = (dst_block[:, 0] >= dctr) & (dst_block[:, 0] < dctr + dln)
-                    yield src, dst, src_block[block_idx], dst_block[block_idx]
-                    dctr += dln
-            src_locs = src_locs[~src_idx]
-            dst_locs = dst_locs[~src_idx]
+                for src, dln in zip(iter(src_chunks), lns):
+                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < dln)
+                    yield dst, src, dst_block[block_idx], src_block[block_idx]
+                    src_block[:, 0] -= dln
+            dst_locs = dst_locs[~dst_idx]
+            src_locs = src_locs[~dst_idx]
             # We sifted `ln` cells out of the dataset, so reduce the ids.
-            src_locs[:, 0] -= ln
+            dst_locs[:, 0] -= ln
 
     def _store_pointers(self, group, chunk, n, total):
         chunks = [Chunk(t, (0, 0, 0)) for t in group.attrs.get("chunk_list", [])]
