@@ -133,8 +133,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @handles_handles("a")
     def connect(self, pre_set, post_set, src_locs, dest_locs, handle=HANDLED):
-        src_locs = np.array(src_locs, copy=False)
-        dest_locs = np.array(dest_locs, copy=False)
+        src_locs = np.array(src_locs, copy=False, dtype=int)
+        dest_locs = np.array(dest_locs, copy=False, dtype=int)
         if not len(src_locs):
             return
         if len(src_locs) != len(dest_locs):
