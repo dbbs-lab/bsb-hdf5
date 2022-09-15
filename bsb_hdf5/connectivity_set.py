@@ -139,6 +139,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
             return
         if len(src_locs) != len(dest_locs):
             raise ValueError("Location matrices must be of same length.")
+        if pre_set._requires_morpho_mapping():
+            src_locs = pre_set._morpho_backmap(src_locs)
+        if post_set._requires_morpho_mapping():
+            dest_locs = post_set._morpho_backmap(dest_locs)
         for data in self._demux(pre_set, post_set, src_locs, dest_locs):
             if not len(data[-1]):
                 # Don't write empty data
