@@ -71,7 +71,7 @@ class PlacementSet(
         IPlacementSet.__init__(self, engine, cell_type)
         ChunkLoader.__init__(self)
         self._labels = None
-        self._subcell_labels = None
+        self._morphology_labels = None
         if not self.exists(engine, cell_type):
             raise DatasetNotFoundError("PlacementSet '{}' does not exist".format(tag))
 
@@ -164,7 +164,9 @@ class PlacementSet(
             mask = self.get_label_mask(self._labels, handle=handle)
             data = data[mask]
         return MorphologySet(
-            self._get_morphology_loaders(handle=handle), data, labels=self._subcell_labels
+            self._get_morphology_loaders(handle=handle),
+            data,
+            labels=self._morphology_labels,
         )
 
     @handles_handles("r")
@@ -327,8 +329,8 @@ class PlacementSet(
     def set_label_filter(self, labels):
         self._labels = labels
 
-    def set_subcell_label_filter(self, subcell_labels):
-        self._subcell_labels = subcell_labels
+    def set_morphology_label_filter(self, morphology_labels):
+        self._morphology_labels = morphology_labels
 
     @handles_handles("r")
     def get_labelled(self, labels, handle=HANDLED):
