@@ -12,7 +12,6 @@ from .resource import Resource, handles_handles, HANDLED
 from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
 import numpy as np
 import itertools
-import operator
 import json
 
 
@@ -167,9 +166,6 @@ class PlacementSet(
         return MorphologySet(
             self._get_morphology_loaders(handle=handle), data, labels=self._subcell_labels
         )
-
-    def get_label_mask(self, labels, handle=None):
-        return self._labels_chunks.load(pad_by="position", handle=handle).get_mask(labels)
 
     @handles_handles("r")
     def _get_morphology_loaders(self, handle=HANDLED):
@@ -335,17 +331,19 @@ class PlacementSet(
         self._subcell_labels = subcell_labels
 
     @handles_handles("r")
-    def get_label_mask(self, labels, handle=HANDLED):
-        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(labels)
-
-    @handles_handles("r")
     def get_labelled(self, labels, handle=HANDLED):
         mask = self.get_label_mask(labels, handle=handle)
         return np.nonzero(mask)[0]
 
+    @handles_handles("r")
+    def get_label_mask(self, labels, handle=HANDLED):
+        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(labels)
+
     def _lendemux(self):
         """
-        Watch out, this function sets the chunk context for as long as it iterates.
+        .. warning::
+
+            This function sets the chunk context for as long as it iterates.
         """
         ctr = 0
         for chunk in self.get_loaded_chunks():
@@ -355,7 +353,9 @@ class PlacementSet(
 
     def _demux(self, ids):
         """
-        Watch out, this function sets the chunk context for as long as it iterates.
+        .. warning::
+
+            This function sets the chunk context for as long as it iterates.
         """
         for chunk in self.get_loaded_chunks():
             with self.chunk_context(chunk):
