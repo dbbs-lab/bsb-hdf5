@@ -165,11 +165,11 @@ class ConnectivitySet(Resource, IConnectivitySet):
             src_block = src_locs[dst_idx]
             if len(src_chunks) == 1:
                 block_idx = np.lexsort((src_block[:, 0], dst_block[:, 0]))
-                yield dst, src, dst_block[block_idx], src_block[block_idx]
+                yield src, dst, src_block[block_idx], dst_block[block_idx]
             else:
                 for src, dln in zip(iter(src_chunks), lns):
                     block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < dln)
-                    yield dst, src, dst_block[block_idx], src_block[block_idx]
+                    yield src, dst, src_block[block_idx], dst_block[block_idx]
                     src_block[:, 0] -= dln
             dst_locs = dst_locs[~dst_idx]
             src_locs = src_locs[~dst_idx]
@@ -212,15 +212,6 @@ class ConnectivitySet(Resource, IConnectivitySet):
             eptr = group.attrs[str(chunks[idx + 1].id)]
         return iptr, eptr
 
-    @handles_handles("r")
-    def _get_chunk_data(self, dest_chunk, handle=HANDLED):
-        grp = h[f"{self._path}/{dest_chunk.id}"]
-        src_chunks = grp.attrs["chunk_list"]
-        chunk_ptrs = [grp.attrs[str(Chunk(c, (0, 0, 0)).id)] for c in src_chunks]
-        src = grp["global_locs"][()]
-        dest = grp["local_locs"][()]
-        return src_chunks, chunk_ptrs, src, dest
-
     @handles_handles("a")
     def chunk_connect(self, src_chunk, dst_chunk, src_locs, dst_locs, handle=HANDLED):
         if len(src_locs) != len(dst_locs):
@@ -234,7 +225,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         # require_dataset doesn't work for resizable datasets, see
         # https://github.com/h5py/h5py/issues/2018
         # So we create a little thingy for requiring src & dest
-        for i, tag in enumerate(("global_locs", "local_locs")):
+        for i, tag in enumerate(("local_locs", "global_locs")):
             if tag in grp:
                 unpack_me[i] = grp[tag]
             else:
@@ -250,14 +241,14 @@ class ConnectivitySet(Resource, IConnectivitySet):
         if eptr is None:
             eptr = total + new_rows
         # Resize and insert data.
-        src_end = lcl_ds[(eptr - new_rows) :]
-        dest_end = gbl_ds[(eptr - new_rows) :]
+        lcl_end = lcl_ds[(eptr - new_rows) :]
+        gbl_end = gbl_ds[(eptr - new_rows) :]
         lcl_ds.resize(len(lcl_ds) + new_rows, axis=0)
         gbl_ds.resize(len(gbl_ds) + new_rows, axis=0)
         lcl_ds[iptr:eptr] = np.concatenate((lcl_ds[iptr : (eptr - new_rows)], lloc))
-        lcl_ds[eptr:] = src_end
+        lcl_ds[eptr:] = lcl_end
         gbl_ds[iptr:eptr] = np.concatenate((gbl_ds[iptr : (eptr - new_rows)], gloc))
-        gbl_ds[eptr:] = dest_end
+        gbl_ds[eptr:] = gbl_end
 
     @handles_handles("r")
     def get_local_chunks(self, direction, handle=HANDLED):
@@ -391,7 +382,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
             cids.append(cid)
             globals.append(gbl)
 
-        lcids = np.repeat([c.id for c in chunks], [len(l) for l in locals])
+        lcids = np.repeat([c.id for c in chunks], [len(len_) for len_ in locals])
         local_ = _better_than_concat(locals, 3, int)
         global_ = _better_than_concat(globals, 3, int)
         gcids = _better_than_concat(cids, 1, int)
