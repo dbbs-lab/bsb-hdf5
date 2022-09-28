@@ -149,8 +149,11 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                     raise MorphologyRepositoryError(
                         f"Trying to store invalid {type(v)} metadata '{k}' on `{name}`."
                     ) from None
-                root.attrs["meta:ldc"] = np.min(morphology._shared._points, axis=0)
-                root.attrs["meta:mdc"] = np.max(morphology._shared._points, axis=0)
+                if len(morphology._shared._points):
+                    root.attrs["meta:ldc"] = np.min(morphology._shared._points, axis=0)
+                    root.attrs["meta:mdc"] = np.max(morphology._shared._points, axis=0)
+                else:
+                    root.attrs["meta:ldc"] = root.attrs["meta:mdc"] = np.nan
 
     def remove(self, name):
         with self._engine._write():
