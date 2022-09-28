@@ -12,6 +12,7 @@ objects within them.
 from bsb.storage._chunks import Chunk
 import numpy as np
 import contextlib
+from .resource import handles_handles, HANDLED
 
 
 class ChunkLoader:
@@ -38,10 +39,10 @@ class ChunkLoader:
             prop = prop_constr(self)
             self.__dict__[f"_{prop.name}_chunks"] = prop
             self._properties.append(prop)
-        for col_name in self.__class__._collections:
-            col = ChunkedCollection(self, col_name)
-            self.__dict__[f"_{col}_chunks"] = col
-            self._collections.append(col)
+        for prop_constr in self.__class__._collections:
+            prop = prop_constr(self)
+            self.__dict__[f"_{prop.collection}_chunks"] = prop
+            self._collections.append(prop)
 
     def get_loaded_chunks(self):
         if not self._chunks:
@@ -66,7 +67,7 @@ class ChunkLoader:
         yield
         self._chunks = old_chunks
 
-    def get_chunk_path(self, chunk=None):
+    def get_chunk_path(self, chunk=None, collection=None, key=None, relative=False):
         """
         Return the full HDF5 path of a chunk.
 
@@ -75,53 +76,51 @@ class ChunkLoader:
         :returns: HDF5 path
         :rtype: str
         """
-        if chunk is None:
-            return f"{self._path}/chunks/"
-        else:
-            return f"{self._path}/chunks/{chunk.id}"
+        path = "chunks"
+        if not relative:
+            path = f"{self._path}/" + path
+        if chunk is not None:
+            path += f"/{chunk.id}"
+            if collection is not None:
+                path += f"/{collection}"
+            if key is not None:
+                path += f"/{key}"
+        return path
 
-    def load_chunk(self, chunk):
+    def include_chunk(self, chunk):
         """
-        Add a chunk to read data from when loading properties/collections.
+        Include a chunk in the data when loading properties/collections.
         """
         self._chunks.add(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
-    def unload_chunk(self, chunk):
+    def exclude_chunk(self, chunk):
         """
-        Remove a chunk to read data from when loading properties/collections.
+        Exclude a chunk from the data when loading properties/collections.
         """
         self._chunks.discard(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
-    def set_chunks(self, chunks):
+    def set_chunk_filter(self, chunks):
         chunks = _to_chunklist(chunks)
         self._chunks = set(chunks)
 
-    def clear_chunks(self):
+    def clear_chunk_filter(self):
         self._chunks = set()
 
-    def require_chunk(self, chunk, handle=None):
+    @handles_handles("a")
+    def require_chunk(self, chunk, handle=HANDLED):
         """
         Create a chunk if it doesn't exist yet, or do nothing.
         """
-        if handle is not None:
-            self._require(chunk, handle)
-        else:
-            with self._engine._write():
-                with self._engine._handle("a") as handle:
-                    self._require(chunk, handle)
-
-    def _require(self, chunk, handle):
         path = self.get_chunk_path(chunk)
-        if path in handle:
-            return
-        chunk_group = handle.create_group(path)
-        self._set_chunk_size(handle, chunk.dimensions)
-        for p in self._properties:
-            chunk_group.create_dataset(
-                f"{path}/{p.name}", p.shape, maxshape=p.maxshape, dtype=p.dtype
-            )
-        for c in self._collections:
-            chunk_group.create_group(path + f"/{c.name}")
+        if path not in handle:
+            chunk_group = handle.create_group(path)
+            self._set_chunk_size(handle, chunk.dimensions)
+            for p in self._properties:
+                chunk_group.create_dataset(
+                    f"{path}/{p.name}", p.shape, maxshape=p.maxshape, dtype=p.dtype
+                )
+            for c in self._collections:
+                chunk_group.create_group(path + f"/{c.collection}")
 
     def clear(self, chunks=None):
         if chunks is None:
@@ -129,6 +128,8 @@ class ChunkLoader:
         for chunk in chunks:
             for prop in self._properties:
                 prop.clear(chunk)
+            for coll in self._collections:
+                coll.clear(chunk)
 
     def _set_chunk_size(self, handle, size):
         fsize = handle.attrs.get("chunk_size", np.full(3, np.nan))
@@ -145,6 +146,8 @@ def _to_chunklist(chunks):
     return [c if isinstance(c, Chunk) else Chunk(c, None) for c in chunks]
 
 
+# The ChunkedProperty and ChunkedCollection are a bit fucked in terms of inheritance and
+# how they handle their polymorphism...
 class ChunkedProperty:
     """
     Chunked properties are stored inside the ``chunks`` group of the :class:`.ChunkLoader`
@@ -152,9 +155,12 @@ class ChunkedProperty:
     of which a dataset exists per property.
     """
 
-    def __init__(self, loader, property, shape, dtype, insert=None, extract=None):
+    def __init__(
+        self, loader, property, shape, dtype, insert=None, extract=None, collection=None
+    ):
         self.loader = loader
         self.name = property
+        self.collection = collection
         self.dtype = dtype
         self.shape = shape
         self.insert = insert
@@ -163,99 +169,107 @@ class ChunkedProperty:
         maxshape[0] = None
         self.maxshape = tuple(maxshape)
 
-    def load(self, raw=False):
-        with self.loader._engine._read():
-            if self.loader._chunks:
-                chunks = self.loader._chunks
-            else:
-                chunks = self.loader.get_all_chunks()
-            reader = self._chunk_reader(raw=raw)
-            chunk_loader = map(reader, chunks)
-            # Concatenate all non-empty chunks together
-            chunked_data = tuple(c for c in chunk_loader if c.size)
+    @handles_handles("r", lambda self: self.loader._engine)
+    def load(self, raw=False, key=None, pad_by=None, handle=HANDLED):
+        if self.loader._chunks:
+            chunks = self.loader._chunks
+        else:
+            chunks = self.loader.get_all_chunks()
+        reader = self.get_chunk_reader(handle, raw, key, pad_by=pad_by)
+        # Read and collect all non empty chunks
+        chunked_data = tuple(data for c in chunks if (data := reader(c)).size)
+        # No data? Return empty
         if not chunked_data:
-            return np.empty(self.shape)
-        return np.concatenate(chunked_data)
+            data = np.empty(self.shape)
+            if self.extract and not raw:
+                return self.extract(data, None)
+            else:
+                return data
+        # Allow custom arrays with concatenate methods to concatenate themselves.
+        if concatenator := getattr(chunked_data[0].__class__, "concatenate", None):
+            return concatenator(*chunked_data)
+        else:
+            return np.concatenate(chunked_data)
 
-    def _chunk_reader(self, raw):
+    def get_chunk_reader(self, handle, raw, key=None, pad_by=None):
         """
         Create a chunk reader that either returns the raw data or extracts it.
         """
+        key = self.name if key is None else key
 
-        def read_chunk(chunk):
-            self.loader.require_chunk(chunk)
-            with self.loader._engine._read():
-                with self.loader._engine._handle("r") as f:
-                    chunk_group = f[self.loader.get_chunk_path(chunk)]
-                    if self.name not in chunk_group:
-                        return np.empty(self.shape)
-                    data = chunk_group[self.name][()]
-                    return data
-
-        # If this property has an extractor and we're not in raw mode, wrap the above
-        # reader to extract the data
-        if not (raw or self.extract is None):
-            _f = read_chunk
-
-            def read_chunk(chunk):
-                data = self.extract(_f(chunk))
-                # Allow only `np.ndarray`. Sorry things that quack, today we're checking
-                # birth certificates. Purebred ducks only.
-                if type(data) is not np.ndarray:
-                    # Just kidding, as long as you quack you're welcome, but you'll have
-                    # to change your family name.
-                    data = np.array(data)
-                return data
+        def read_chunk(chunk, pad=0):
+            if pad_by:
+                pad = len(handle[self._chunk_path(chunk, pad_by)])
+            try:
+                chunk_group = handle[self._chunk_path(chunk, key)]
+            except KeyError:
+                chunk_group = None
+                data = np.zeros((pad, *self.shape[1:]), dtype=self.dtype)
+            else:
+                data = chunk_group[()]
+                if len(data) < pad:
+                    fillshape = (pad - len(data), *self.shape[1:])
+                    data = np.concatenate((data, np.zeros(fillshape, dtype=self.dtype)))
+            if not (raw or self.extract is None):
+                data = self.extract(data, chunk_group)
+            return data
 
         # Return the created function
         return read_chunk
 
-    def append(self, chunk, data):
+    @handles_handles("a", lambda self: self.loader._engine)
+    def append(self, chunk, data, key=None, handle=HANDLED):
         """
         Append data to a property chunk. Will create it if it doesn't exist.
 
         :param chunk: Chunk
         :type chunk: :class:`bsb.storage.Chunk`
         """
+        key = key or self.name
         if self.insert is not None:
             data = self.insert(data)
-        with self.loader._engine._write():
-            with self.loader._engine._handle("a") as f:
-                self.loader.require_chunk(chunk, handle=f)
-                chunk_group = f[self.loader.get_chunk_path(chunk)]
-                if self.name not in chunk_group:
-                    chunk_group.create_dataset(
-                        self.name,
-                        self.shape,
-                        data=data,
-                        maxshape=self.maxshape,
-                        dtype=self.dtype,
-                    )
-                else:
-                    dset = chunk_group[self.name]
-                    start_pos = dset.shape[0]
-                    dset.resize(start_pos + len(data), axis=0)
-                    dset[start_pos:] = data
+        self.loader.require_chunk(chunk, handle)
+        chunk_group = handle[self._chunk_path(chunk)]
+        if key not in chunk_group:
+            chunk_group.create_dataset(
+                key,
+                self.shape,
+                data=data,
+                maxshape=self.maxshape,
+                dtype=self.dtype,
+            )
+        else:
+            dset = chunk_group[key]
+            start_pos = dset.shape[0]
+            dset.resize(start_pos + len(data), axis=0)
+            dset[start_pos:] = data
 
-    def clear(self, chunk):
-        with self.loader._engine._write():
-            with self.loader._engine._handle("a") as f:
-                self.loader.require_chunk(chunk, handle=f)
-                chunk_group = f[self.loader.get_chunk_path(chunk)]
-                if self.name not in chunk_group:
-                    chunk_group.create_dataset(
-                        self.name,
-                        self.shape,
-                        data=np.empty(self.shape),
-                        maxshape=self.maxshape,
-                        dtype=self.dtype,
-                    )
-                else:
-                    dset = chunk_group[self.name]
-                    dset.resize(0, axis=0)
+    @handles_handles("a", lambda self: self.loader._engine)
+    def clear(self, chunk, key=None, handle=HANDLED):
+        key = key or self.name
+        chunk_group = handle[self._chunk_path(chunk)]
+        if key not in chunk_group:
+            chunk_group.create_dataset(
+                key,
+                self.shape,
+                data=np.empty(self.shape, dtype=self.dtype),
+                maxshape=self.maxshape,
+                dtype=self.dtype,
+            )
+        else:
+            dset = chunk_group[key]
+            dset.resize(0, axis=0)
+
+    @handles_handles("a", lambda self: self.loader._engine)
+    def overwrite(self, chunk, data, key=None, handle=HANDLED):
+        self.clear(chunk, key, handle)
+        self.append(chunk, data, key, handle)
+
+    def _chunk_path(self, chunk, key=None):
+        return self.loader.get_chunk_path(chunk, self.collection, key)
 
 
-class ChunkedCollection:
+class ChunkedCollection(ChunkedProperty):
     """
     Chunked collections are stored inside the ``chunks`` group of the
     :class:`.ChunkLoader` they belong to. Inside the ``chunks`` group another group is
@@ -263,6 +277,22 @@ class ChunkedCollection:
     datasets can be stored inside of this collection.
     """
 
-    def __init__(self, loader, property):
-        self.loader = loader
-        self.name = property
+    def __init__(self, loader, collection, shape, dtype, insert=None, extract=None):
+        super().__init__(loader, None, shape, dtype, insert, extract, collection)
+
+    @handles_handles("r", lambda self: self.loader._engine)
+    def load(self, key, handle=HANDLED, **kwargs):
+        return super().load(key=key, handle=handle, **kwargs)
+
+    @handles_handles("a", lambda self: self.loader._engine)
+    def append(self, chunk, data, key, handle=HANDLED, **kwargs):
+        return super().append(chunk, data, key=key, handle=handle, **kwargs)
+
+    @handles_handles("a", lambda self: self.loader._engine)
+    def overwrite(self, chunk, data, key, handle=HANDLED, **kwargs):
+        return super().overwrite(chunk, data, key=key, handle=handle, **kwargs)
+
+    @handles_handles("a", lambda self: self.loader._engine)
+    def clear(self, chunk, handle=HANDLED):
+        del handle[self._chunk_path(chunk)]
+        handle.create_group(self._chunk_path(chunk))

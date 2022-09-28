@@ -1,5 +1,48 @@
 import numpy as np
 import h5py
+import inspect
+import functools
+
+
+# Semantic marker for things that get injected
+HANDLED = None
+
+
+# Decorator to inject handles
+def handles_handles(handle_type, handler=lambda self: self._engine):
+    lock_f = {"r": lambda eng: eng._read, "a": lambda eng: eng._write}.get(handle_type)
+
+    def decorator(f):
+        sig = inspect.signature(f)
+        if "handle" not in sig.parameters:
+            raise ValueError(
+                f"`{f.__module__}.{f.__name__}` needs handle to be handled by handles_handles. Clearly."
+            )
+
+        @functools.wraps(f)
+        def decorated(self, *args, handle=None, **kwargs):
+            engine = handler(self)
+            lock = lock_f(engine)
+            try:
+                bound = sig.bind(self, *args, **kwargs)
+            except TypeError:
+                # Re-call the actual function, for better TypeError
+                try:
+                    f(self, *args, **kwargs)
+                except TypeError as e:
+                    # Re-raise the exception from None for better stack trace
+                    raise e from None
+            if bound.arguments.get("handle", None) is None:
+                with lock():
+                    with engine._handle(handle_type) as handle:
+                        bound.arguments["handle"] = handle
+                        return f(*bound.args, **bound.kwargs)
+            else:
+                return f(*bound.args, **bound.kwargs)
+
+        return decorated
+
+    return decorator
 
 
 class Resource:

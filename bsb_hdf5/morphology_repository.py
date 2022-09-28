@@ -1,4 +1,5 @@
-from bsb.morphologies import Morphology, Branch, _Labels
+from bsb.morphologies import Morphology, Branch
+from bsb._encoding import EncodedLabels
 from bsb.exceptions import MorphologyRepositoryError, MissingMorphologyError
 from bsb.storage.interfaces import (
     MorphologyRepository as IMorphologyRepository,
@@ -69,7 +70,7 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                 labelsets = {
                     int(k): v for k, v in json.loads(root["data"].attrs["labels"]).items()
                 }
-                labels = _Labels(
+                labels = EncodedLabels(
                     len(points), buffer=data[:, 4].astype(int), labels=labelsets
                 )
                 prop_names = root["data"].attrs["properties"]

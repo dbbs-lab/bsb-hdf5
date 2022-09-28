@@ -4,25 +4,15 @@ from bsb.exceptions import (
     DatasetNotFoundError,
 )
 from bsb.storage import Chunk
+from bsb._encoding import EncodedLabels
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
 from bsb.morphologies.selector import MorphologySelector
-from .resource import Resource
-from .chunks import ChunkLoader, ChunkedProperty
+from .resource import Resource, handles_handles, HANDLED
+from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
 import numpy as np
 import itertools
-
-
-def _pos_prop(loader):
-    return ChunkedProperty(loader, "position", shape=(0, 3), dtype=float)
-
-
-def _rot_prop(loader):
-    return ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float)
-
-
-def _morpho_prop(loader):
-    return ChunkedProperty(loader, "morphology", shape=(0,), dtype=int)
+import json
 
 
 _root = "/placement/"
@@ -54,8 +44,17 @@ class PlacementSet(
     Resource,
     ChunkLoader,
     IPlacementSet,
-    properties=(_pos_prop, _rot_prop, _morpho_prop),
-    collections=("labels", "additional"),
+    properties=(
+        lambda loader: ChunkedProperty(loader, "position", shape=(0, 3), dtype=float),
+        lambda loader: ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float),
+        lambda loader: ChunkedProperty(loader, "morphology", shape=(0,), dtype=int),
+        lambda loader: ChunkedProperty(
+            loader, "labels", shape=(0,), dtype=int, extract=encode_labels
+        ),
+    ),
+    collections=(
+        lambda loader: ChunkedCollection(loader, "additional", shape=(0,), dtype=float),
+    ),
 ):
     """
     Fetches placement data from storage.
@@ -68,9 +67,11 @@ class PlacementSet(
 
     def __init__(self, engine, cell_type):
         tag = cell_type.name
-        super().__init__(engine, _root + tag)
+        Resource.__init__(self, engine, _root + tag)
         IPlacementSet.__init__(self, engine, cell_type)
         ChunkLoader.__init__(self)
+        self._labels = None
+        self._morphology_labels = None
         if not self.exists(engine, cell_type):
             raise DatasetNotFoundError("PlacementSet '{}' does not exist".format(tag))
 
@@ -106,7 +107,8 @@ class PlacementSet(
                 g.require_group("chunks")
         return cls(engine, cell_type)
 
-    def load_positions(self):
+    @handles_handles("r")
+    def load_positions(self, handle=HANDLED):
         """
         Load the cell positions.
 
@@ -114,13 +116,20 @@ class PlacementSet(
            cell type.
         """
         try:
-            return self._position_chunks.load()
+            positions = self._position_chunks.load(handle=handle)
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
-                "No position information for the '{}' placement set.".format(self.tag)
+                f"No position information for the '{self.tag}' placement set."
             )
+        else:
+            if self._labels:
+                mask = self.get_label_mask(self._labels, handle=handle)
+                return positions[mask]
+            else:
+                return positions
 
-    def load_rotations(self):
+    @handles_handles("r")
+    def load_rotations(self, handle=HANDLED):
         """
         Load the cell rotations.
 
@@ -128,46 +137,55 @@ class PlacementSet(
            cell type.
         """
         try:
-            return RotationSet(self._rotation_chunks.load())
+            data = self._rotation_chunks.load(handle=handle)
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
-                "No rotation information for the '{}' placement set.".format(self.tag)
+                f"No rotation information for the '{self.tag}' placement set."
             )
+        if self._labels:
+            mask = self.get_label_mask(self._labels, handle=handle)
+            data = data[mask]
+        return RotationSet(data)
 
-    def load_morphologies(self):
+    @handles_handles("r")
+    def load_morphologies(self, handle=HANDLED):
         """
         Load the cell morphologies.
 
         :raises: DatasetNotFoundError when the morphology data is not found.
         """
         try:
-            return MorphologySet(
-                self._get_morphology_loaders(), self._morphology_chunks.load()
-            )
+            data = self._morphology_chunks.load(handle=handle)
         except DatasetNotFoundError:
             raise DatasetNotFoundError(
-                "No morphology information for the '{}' placement set.".format(self.tag)
+                f"No morphology information for the '{self.tag}' placement set."
             )
+        if self._labels:
+            mask = self.get_label_mask(self._labels, handle=handle)
+            data = data[mask]
+        return MorphologySet(
+            self._get_morphology_loaders(handle=handle),
+            data,
+            labels=self._morphology_labels,
+        )
 
-    def _get_morphology_loaders(self):
+    @handles_handles("r")
+    def _get_morphology_loaders(self, handle=HANDLED):
         loaded_names = set()
         stor_mor = []
-        with self._engine._read():
-            with self._engine._handle("r") as f:
-                for chunk in self.get_loaded_chunks():
-                    path = self.get_chunk_path(chunk)
-                    _map = f[path].attrs.get("morphology_loaders", [])
-                    cmlist = self._engine.morphologies.select(_MapSelector(self, _map))
-                    stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
-                    loaded_names.update(m.name for m in cmlist)
+        for chunk in self.get_loaded_chunks():
+            path = self.get_chunk_path(chunk)
+            _map = handle[path].attrs.get("morphology_loaders", [])
+            cmlist = self._engine.morphologies.select(_MapSelector(self, _map))
+            stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
+            loaded_names.update(m.name for m in cmlist)
         return stor_mor
 
-    def _set_morphology_loaders(self, map):
-        with self._engine._write():
-            with self._engine._handle("a") as f:
-                for chunk in self.get_loaded_chunks():
-                    path = self.get_chunk_path(chunk)
-                    f[path].attrs["morphology_loaders"] = map
+    @handles_handles("a")
+    def _set_morphology_loaders(self, map, handle=HANDLED):
+        for chunk in self.get_loaded_chunks():
+            path = self.get_chunk_path(chunk)
+            handle[path].attrs["morphology_loaders"] = map
 
     def __iter__(self):
         return itertools.zip_longest(
@@ -176,7 +194,10 @@ class PlacementSet(
         )
 
     def __len__(self):
-        return len(self._position_chunks.load())
+        if self._labels:
+            return np.sum(self._labels_chunks.load().get_mask(self._labels))
+        else:
+            return len(self._position_chunks.load())
 
     def append_data(
         self,
@@ -256,3 +277,107 @@ class PlacementSet(
                     start_pos = dset.shape[0]
                     dset.resize(start_pos + len(data), axis=0)
                     dset[start_pos:] = data
+
+    @handles_handles("a")
+    def label_by_mask(self, mask, labels, handle=HANDLED):
+        cells = np.array(mask, copy=False)
+        if cells.dtype != bool or len(cells) != len(self):
+            raise LabellingException("Mask doesn't fit data.")
+        self._write_labels(
+            labels,
+            handle,
+            lambda: self._lendemux(),
+            lambda s: cells[s],
+        )
+
+    @handles_handles("a")
+    def label(self, labels, cells, handle=HANDLED):
+        cells = np.array(cells, copy=False)
+        len_ = len(self)
+        oob = cells > len_
+        if np.any(oob):
+            oob_idx = cells[oob]
+            raise LabellingException(
+                f"Cell labels {oob_idx} out of range for placement set with size {len_}."
+            )
+        self._write_labels(
+            labels,
+            handle,
+            lambda: self._demux(cells),
+            lambda x: x,
+        )
+
+    def _write_labels(self, labels, handle, demux_f, data_f):
+        label_reader = self._labels_chunks.get_chunk_reader(
+            handle, False, pad_by="position"
+        )
+        updated_labels = None
+        # Demultiplex the cells per chunk. _demux also sets chunk context to current chunk
+        for chunk, block in demux_f():
+            enc_labels = label_reader(chunk)
+            if updated_labels:
+                enc_labels.labels = updated_labels
+            else:
+                updated_labels = enc_labels.labels
+            enc_labels.label(labels, data_f(block))
+            self._labels_chunks.overwrite(chunk, enc_labels, handle=handle)
+        if updated_labels is not None:
+            handle[self._path].attrs["labelsets"] = json.dumps(
+                updated_labels, default=list
+            )
+
+    def set_label_filter(self, labels):
+        self._labels = labels
+
+    def set_morphology_label_filter(self, morphology_labels):
+        self._morphology_labels = morphology_labels
+
+    @handles_handles("r")
+    def get_labelled(self, labels, handle=HANDLED):
+        mask = self.get_label_mask(labels, handle=handle)
+        return np.nonzero(mask)[0]
+
+    @handles_handles("r")
+    def get_label_mask(self, labels, handle=HANDLED):
+        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(labels)
+
+    def _lendemux(self):
+        """
+        .. warning::
+
+            This function sets the chunk context for as long as it iterates.
+        """
+        ctr = 0
+        for chunk in self.get_loaded_chunks():
+            with self.chunk_context(chunk):
+                len_ = len(self)
+                yield (chunk, slice(ctr, ctr := ctr + len_))
+
+    def _demux(self, ids):
+        """
+        .. warning::
+
+            This function sets the chunk context for as long as it iterates.
+        """
+        for chunk in self.get_loaded_chunks():
+            with self.chunk_context(chunk):
+                ln = len(self)
+                idx = ids < ln
+                block = ids[idx]
+                yield chunk, block
+                ids = ids[~idx]
+                ids -= ln
+
+
+def encode_labels(data, ds):
+    if ds is None:
+        return EncodedLabels.none(len(data))
+    else:
+        ps_group = ds.parent.parent.parent
+        serialized = json.dumps(EncodedLabels.none(1).labels, default=list)
+        labels = json.loads(ps_group.attrs.get("labelsets", serialized))
+        return EncodedLabels(shape=data.shape, buffer=data, labels=labels)
+
+
+class LabellingException(Exception):
+    pass
