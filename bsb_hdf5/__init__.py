@@ -106,7 +106,6 @@ class HDF5Engine(Engine):
     @on_main_until(lambda self: self.exists())
     def create(self):
         with self._handle("w") as handle:
-            handle.create_group("cells")
             handle.create_group("placement")
             handle.create_group("connectivity")
             handle.create_group("files")
