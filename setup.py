@@ -16,7 +16,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 requires = [
-    "bsb~=4.0.0a40",
+    "bsb~=4.0.0a41",
     "shortuuid",
 ]
 
