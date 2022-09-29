@@ -136,35 +136,30 @@ class PlacementSet(
         :raises: DatasetNotFoundError when there is no rotation information for this
            cell type.
         """
-        try:
-            data = self._rotation_chunks.load(handle=handle)
-        except DatasetNotFoundError:
-            raise DatasetNotFoundError(
-                f"No rotation information for the '{self.tag}' placement set."
-            )
+        data = self._rotation_chunks.load(handle=handle)
+        if len(data) == 0 and len(self) != 0:
+            raise DatasetNotFoundError("No rotation data available.")
         if self._labels:
             mask = self.get_label_mask(self._labels, handle=handle)
             data = data[mask]
         return RotationSet(data)
 
     @handles_handles("r")
-    def load_morphologies(self, handle=HANDLED):
+    def load_morphologies(self, handle=HANDLED, allow_empty=False):
         """
         Load the cell morphologies.
 
         :raises: DatasetNotFoundError when the morphology data is not found.
         """
-        try:
-            data = self._morphology_chunks.load(handle=handle)
-        except DatasetNotFoundError:
-            raise DatasetNotFoundError(
-                f"No morphology information for the '{self.tag}' placement set."
-            )
+        data = self._morphology_chunks.load(handle=handle)
+        loaders = self._get_morphology_loaders(handle=handle)
+        if not allow_empty and (len(data) == 0 and (len(self) != 0 or len(loaders) == 0)):
+            raise DatasetNotFoundError("No morphology data available.")
         if self._labels:
             mask = self.get_label_mask(self._labels, handle=handle)
             data = data[mask]
         return MorphologySet(
-            self._get_morphology_loaders(handle=handle),
+            loaders,
             data,
             labels=self._morphology_labels,
         )
@@ -255,7 +250,7 @@ class PlacementSet(
 
     def _append_morphologies(self, chunk, new_set):
         with self.chunk_context(chunk):
-            morphology_set = self.load_morphologies().merge(new_set)
+            morphology_set = self.load_morphologies(allow_empty=True).merge(new_set)
             self._set_morphology_loaders(morphology_set._serialize_loaders())
             self._morphology_chunks.clear(chunk)
             self._morphology_chunks.append(chunk, morphology_set.get_indices())
