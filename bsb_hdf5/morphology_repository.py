@@ -154,6 +154,8 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                     root.attrs["meta:mdc"] = np.max(morphology._shared._points, axis=0)
                 else:
                     root.attrs["meta:ldc"] = root.attrs["meta:mdc"] = np.nan
+                meta = _meta(root)
+        return StoredMorphology(name, lambda: morphology, meta)
 
     def remove(self, name):
         with self._engine._write():
