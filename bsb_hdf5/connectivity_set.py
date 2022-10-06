@@ -341,8 +341,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :returns: The local and global connections locations
         :rtype: Tuple[numpy.ndarray, numpy.ndarray]
         """
-        local_grp = handle[self._path][f"{direction}/{local_.id}"]
-        start, end = self._get_insert_pointers(local_grp, global_)
+        try:
+            local_grp = handle[self._path][f"{direction}/{local_.id}"]
+            start, end = self._get_insert_pointers(local_grp, global_)
+        except KeyError:
+            # If a local or global chunk isn't found, return empty data.
+            return (np.empty((0, 3), dtype=int), np.empty((0, 3), dtype=int))
+
         idx = slice(start, end)
         return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
 
