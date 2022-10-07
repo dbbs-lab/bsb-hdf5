@@ -325,6 +325,12 @@ class PlacementSet(
         self._labels = labels
 
     def set_morphology_label_filter(self, morphology_labels):
+        """
+        Sets the labels by which any morphology loaded from this set will be filtered.
+
+        :param morphology_labels: List of labels to filter the morphologies by.
+        :type morphology_labels: List[str]
+        """
         self._morphology_labels = morphology_labels
 
     @handles_handles("r")

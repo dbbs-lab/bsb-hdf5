@@ -7,6 +7,10 @@ import numpy as np
 _root = "/connectivity/"
 
 
+class LocationOutOfBoundsError(Exception):
+    pass
+
+
 class ConnectivitySet(Resource, IConnectivitySet):
     """
     Fetches placement data from storage.
@@ -155,6 +159,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         for src in iter(src_chunks):
             with pre.chunk_context(src):
                 lns.append(len(pre))
+        dmax = 0
         # Iterate over each source chunk
         for dst in post.get_loaded_chunks():
             # Count the number of cells
@@ -167,14 +172,31 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 block_idx = np.lexsort((src_block[:, 0], dst_block[:, 0]))
                 yield src, dst, src_block[block_idx], dst_block[block_idx]
             else:
-                for src, dln in zip(iter(src_chunks), lns):
+                for src, sln in zip(iter(src_chunks), lns):
                     block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < dln)
                     yield src, dst, src_block[block_idx], dst_block[block_idx]
-                    src_block[:, 0] -= dln
+                    src_block[:, 0] -= sln
             dst_locs = dst_locs[~dst_idx]
             src_locs = src_locs[~dst_idx]
             # We sifted `ln` cells out of the dataset, so reduce the ids.
             dst_locs[:, 0] -= ln
+            dmax += ln
+        if len(dst_locs) > 0:
+            smax = sum(lns) - 1
+            dmax -= 1
+            src_msg = ""
+            if (m := np.max(src_locs)) > smax:
+                src_msg = f"Source maximum is {smax}, but up to {m} given."
+            dst_msg = ""
+            if (m := np.max(src_locs)) > smax:
+                if src_msg:
+                    dst_msg = "\n"
+                dst_msg += f"Destination maximum is {dmax}, but up to {m} given."
+            raise LocationOutOfBoundsError(
+                f"Received {len(dst_locs)} out of bounds locations:"
+                f"\n- Source locations:\n{src_locs}"
+                f"\n- Destinations:\n{dst_locs}\n" + src_msg + dst_msg
+            )
 
     def _store_pointers(self, group, chunk, n, total):
         chunks = [Chunk(t, (0, 0, 0)) for t in group.attrs.get("chunk_list", [])]
@@ -341,8 +363,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :returns: The local and global connections locations
         :rtype: Tuple[numpy.ndarray, numpy.ndarray]
         """
-        local_grp = handle[self._path][f"{direction}/{local_.id}"]
-        start, end = self._get_insert_pointers(local_grp, global_)
+        try:
+            local_grp = handle[self._path][f"{direction}/{local_.id}"]
+            start, end = self._get_insert_pointers(local_grp, global_)
+        except KeyError:
+            # If a local or global chunk isn't found, return empty data.
+            return (np.empty((0, 3), dtype=int), np.empty((0, 3), dtype=int))
+
         idx = slice(start, end)
         return (local_grp["local_locs"][idx], local_grp["global_locs"][idx])
 
@@ -372,6 +399,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @handles_handles("r")
     def load_connections(self, direction="out", handle=HANDLED):
+        """
+        Load all connections. Careful, may lead to out of memory errors for large
+        connection sets.
+
+        :param direction: Incoming or outgoing perspective.
+        :type direction: str
+        """
         chunks = self.get_local_chunks(direction, handle=handle)
         locals = []
         cids = []
