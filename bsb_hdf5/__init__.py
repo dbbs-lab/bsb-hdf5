@@ -1,7 +1,6 @@
 from bsb import config
 from bsb.services import MPILock
-from bsb.config.nodes import StorageNode as IStorageNode
-from bsb.storage.interfaces import Engine
+from bsb.storage.interfaces import Engine, StorageNode as IStorageNode
 from .placement_set import PlacementSet
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore

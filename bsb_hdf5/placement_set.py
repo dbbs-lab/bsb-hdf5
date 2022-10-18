@@ -3,6 +3,7 @@ from bsb.exceptions import (
     DatasetExistsError,
     DatasetNotFoundError,
 )
+from bsb import config
 from bsb.storage import Chunk
 from bsb._encoding import EncodedLabels
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
@@ -18,12 +19,12 @@ import json
 _root = "/placement/"
 
 
+@config.node
 class _MapSelector(MorphologySelector):
-    def __new__(cls, *args, **kwargs):
-        # Disable config node object creation
-        return object.__new__(cls)
+    ps = config.attr(type=lambda x: x)
+    names = config.attr(type=lambda x: x)
 
-    def __init__(self, ps, names):
+    def __init__(self, *, ps=None, names=None):
         self._ps = ps
         self._names = set(names)
 
@@ -171,7 +172,7 @@ class PlacementSet(
         for chunk in self.get_loaded_chunks():
             path = self.get_chunk_path(chunk)
             _map = handle[path].attrs.get("morphology_loaders", [])
-            cmlist = self._engine.morphologies.select(_MapSelector(self, _map))
+            cmlist = self._engine.morphologies.select(_MapSelector(ps=self, names=_map))
             stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
             loaded_names.update(m.name for m in cmlist)
         return stor_mor

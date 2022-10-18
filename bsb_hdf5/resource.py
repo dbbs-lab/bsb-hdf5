@@ -20,7 +20,7 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
             )
 
         @functools.wraps(f)
-        def decorated(self, *args, handle=None, **kwargs):
+        def handle_indirection(self, *args, handle=None, **kwargs):
             engine = handler(self)
             lock = lock_f(engine)
             try:
@@ -40,7 +40,7 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
             else:
                 return f(*bound.args, **bound.kwargs)
 
-        return decorated
+        return handle_indirection
 
     return decorator
 
