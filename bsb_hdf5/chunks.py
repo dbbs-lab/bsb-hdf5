@@ -53,7 +53,7 @@ class ChunkLoader:
     def get_all_chunks(self):
         with self._engine._read():
             with self._engine._handle("r") as h:
-                chunks = list(h[self._path + "/chunks"].keys())
+                chunks = list(h[self._path].keys())
                 if chunks:
                     # If any chunks have been written, this HDF5 file is tagged with a
                     # chunk size
@@ -67,7 +67,7 @@ class ChunkLoader:
         yield
         self._chunks = old_chunks
 
-    def get_chunk_path(self, chunk=None, collection=None, key=None, relative=False):
+    def get_chunk_path(self, chunk=None, collection=None, key=None):
         """
         Return the full HDF5 path of a chunk.
 
@@ -76,9 +76,7 @@ class ChunkLoader:
         :returns: HDF5 path
         :rtype: str
         """
-        path = "chunks"
-        if not relative:
-            path = f"{self._path}/" + path
+        path = f"{self._path}"
         if chunk is not None:
             path += f"/{chunk.id}"
             if collection is not None:

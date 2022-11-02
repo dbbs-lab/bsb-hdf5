@@ -87,8 +87,7 @@ class PlacementSet(
             with engine._handle("a") as h:
                 if path in h:
                     raise DatasetExistsError(f"PlacementSet '{tag}' already exists.")
-                g = h.create_group(path)
-                g.create_group("chunks")
+                h.create_group(path)
         return cls(engine, cell_type)
 
     @staticmethod
@@ -103,8 +102,7 @@ class PlacementSet(
         path = _root + tag
         with engine._write():
             with engine._handle("a") as h:
-                g = h.require_group(path)
-                g.require_group("chunks")
+                h.require_group(path)
         return cls(engine, cell_type)
 
     @handles_handles("r")
