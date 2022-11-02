@@ -1,7 +1,6 @@
 from bsb import config
 from bsb.services import MPILock
-from bsb.config.nodes import StorageNode as IStorageNode
-from bsb.storage.interfaces import Engine
+from bsb.storage.interfaces import Engine, StorageNode as IStorageNode
 from .placement_set import PlacementSet
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
@@ -87,6 +86,14 @@ class HDF5Engine(Engine):
     @property
     def root_slug(self):
         return os.path.relpath(self._root)
+
+    @classmethod
+    def recognizes(cls, root):
+        try:
+            h5py.File(root, "r").close()
+            return True
+        except Exception:
+            return False
 
     def _read(self):
         return self._lock.read()
