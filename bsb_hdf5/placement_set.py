@@ -192,6 +192,7 @@ class PlacementSet(
         else:
             return len(self._position_chunks.load())
 
+    @handles_handles("a")
     def append_data(
         self,
         chunk,
@@ -200,6 +201,7 @@ class PlacementSet(
         rotations=None,
         additional=None,
         count=None,
+        handle=HANDLED,
     ):
         """
         Append data to the placement set.
@@ -225,17 +227,12 @@ class PlacementSet(
                     "The `count` keyword is reserved for creating entities,"
                     + " without any positional, or morphological data."
                 )
-            with self._engine._write():
-                with self._engine._handle("a") as f:
-                    self.require_chunk(chunk, handle=f)
-                    path = self.get_chunk_path(chunk)
-                    prev_count = f[path].attrs.get("entity_count", 0)
-                    f[path].attrs["entity_count"] = prev_count + count
+            self.require_chunk(chunk, handle=handle)
 
-        if positions is not None:
-            self._position_chunks.append(chunk, positions)
         if rotations is not None and morphologies is None:
             raise ValueError("Can't append rotations without morphologies.")
+        if positions is not None:
+            self._position_chunks.append(chunk, positions)
         if morphologies is not None:
             self._append_morphologies(chunk, morphologies)
             if rotations is None:
@@ -245,6 +242,7 @@ class PlacementSet(
         if additional is not None:
             for key, ds in additional.items():
                 self.append_additional(key, chunk, ds)
+        self._track_add(handle, chunk, len(positions))
 
     def _append_morphologies(self, chunk, new_set):
         with self.chunk_context(chunk):
@@ -366,6 +364,20 @@ class PlacementSet(
                 yield chunk, block
                 ids = ids[~idx]
                 ids -= ln
+
+    def _track_add(self, handle, chunk, count):
+        # Track addition in global chunk stats
+        global_stats = json.loads(handle.attrs.get("chunks", "{}"))
+        stats = global_stats.setdefault(
+            str(chunk.id), {"placed": 0, "connections": {"inc": 0, "out": 0}}
+        )
+        stats["placed"] += count
+        handle.attrs["chunks"] = json.dumps(global_stats)
+        # Track addition in placement set
+        handle[self._path].attrs["len"] = handle[self._path].attrs.get("len", 0) + count
+        chunk_stats = json.loads(handle[self._path].attrs.get("chunks", "{}"))
+        chunk_stats[str(chunk.id)] = chunk_stats.get(str(chunk.id), 0) + count
+        handle[self._path].attrs["chunks"] = json.dumps(chunk_stats)
 
 
 def encode_labels(data, ds):
