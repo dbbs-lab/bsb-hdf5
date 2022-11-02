@@ -173,7 +173,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 yield src, dst, src_block[block_idx], dst_block[block_idx]
             else:
                 for src, sln in zip(iter(src_chunks), lns):
-                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < ln)
+                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < sln)
                     yield src, dst, src_block[block_idx], dst_block[block_idx]
                     src_block[:, 0] -= sln
             dst_locs = dst_locs[~dst_idx]
