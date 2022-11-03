@@ -3,6 +3,7 @@ from .resource import Resource, handles_handles, HANDLED
 from bsb.storage._chunks import Chunk
 from bsb.storage.interfaces import ConnectivitySet as IConnectivitySet
 import numpy as np
+import json
 
 _root = "/connectivity/"
 
@@ -173,7 +174,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 yield src, dst, src_block[block_idx], dst_block[block_idx]
             else:
                 for src, sln in zip(iter(src_chunks), lns):
-                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < ln)
+                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < sln)
                     yield src, dst, src_block[block_idx], dst_block[block_idx]
                     src_block[:, 0] -= sln
             dst_locs = dst_locs[~dst_idx]
@@ -240,6 +241,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
             raise ValueError("Location matrices must be of same length.")
         self._insert("inc", dst_chunk, src_chunk, dst_locs, src_locs, handle)
         self._insert("out", src_chunk, dst_chunk, src_locs, dst_locs, handle)
+        self._track_add(handle, src_chunk, dst_chunk, len(src_locs))
 
     def _insert(self, tag, local_, global_, lloc, gloc, handle):
         grp = handle.require_group(f"{self._path}/{tag}/{local_.id}")
@@ -271,6 +273,25 @@ class ConnectivitySet(Resource, IConnectivitySet):
         lcl_ds[eptr:] = lcl_end
         gbl_ds[iptr:eptr] = np.concatenate((gbl_ds[iptr : (eptr - new_rows)], gloc))
         gbl_ds[eptr:] = gbl_end
+
+    def _track_add(self, handle, src_chunk, dst_chunk, count):
+        for tag, chunk in (("inc", dst_chunk), ("out", src_chunk)):
+            id = str(chunk.id)
+            # Track addition in global chunk stats
+            global_stats = json.loads(handle.attrs.get("chunks", "{}"))
+            stats = global_stats.setdefault(
+                id, {"placed": 0, "connections": {"inc": 0, "out": 0}}
+            )
+            stats["connections"][tag] += count
+            handle.attrs["chunks"] = json.dumps(global_stats)
+            # Track addition in connectivity set
+            group = handle[self._path]
+            if tag == "out":
+                group.attrs["len"] = group.attrs.get("len", 0) + count
+            chunk_stats = json.loads(group.attrs.get("chunks", "{}"))
+            stats = chunk_stats.setdefault(id, {"inc": 0, "out": 0})
+            stats[tag] += count
+            group.attrs["chunks"] = json.dumps(chunk_stats)
 
     @handles_handles("r")
     def get_local_chunks(self, direction, handle=HANDLED):

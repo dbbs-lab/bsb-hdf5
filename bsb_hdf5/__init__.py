@@ -87,6 +87,14 @@ class HDF5Engine(Engine):
     def root_slug(self):
         return os.path.relpath(self._root)
 
+    @classmethod
+    def recognizes(cls, root):
+        try:
+            h5py.File(root, "r").close()
+            return True
+        except Exception:
+            return False
+
     def _read(self):
         return self._lock.read()
 
