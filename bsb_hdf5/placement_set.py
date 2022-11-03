@@ -300,19 +300,26 @@ class PlacementSet(
         )
 
     def _write_labels(self, labels, handle, demux_f, data_f):
+        # Create a label reader that can read out label data per chunk, and pads missing
+        # cells with unlabelled cells.
         label_reader = self._labels_chunks.get_chunk_reader(
             handle, False, pad_by="position"
         )
         updated_labels = None
-        # Demultiplex the cells per chunk. _demux also sets chunk context to current chunk
+        # Demultiplex the cells per chunk. demux_f sets chunk context to current chunk
         for chunk, block in demux_f():
             enc_labels = label_reader(chunk)
+            # The label reader gets the labelsets from a shared attribute on the PS, so we
+            # keep and update 1 shared reference, that we update after the loop.
             if updated_labels:
                 enc_labels.labels = updated_labels
             else:
                 updated_labels = enc_labels.labels
+            # Label the cells
             enc_labels.label(labels, data_f(block))
+            # Overwrite with new labelled data.
             self._labels_chunks.overwrite(chunk, enc_labels, handle=handle)
+        # Update the shared labelset reference on the PS.
         if updated_labels is not None:
             handle[self._path].attrs["labelsets"] = json.dumps(
                 updated_labels, default=list
