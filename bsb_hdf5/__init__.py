@@ -6,6 +6,7 @@ from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
 from .morphology_repository import MorphologyRepository
 from datetime import datetime
+import json
 import h5py
 import os
 import shutil
@@ -77,6 +78,7 @@ class HDF5Engine(Engine):
     def __init__(self, root, comm):
         super().__init__(root, comm)
         self._lock = MPILock.sync()
+        self._readonly = False
 
     def __eq__(self, other):
         eq_format = self._format == getattr(other, "_format", None)
@@ -96,16 +98,28 @@ class HDF5Engine(Engine):
             return False
 
     def _read(self):
-        return self._lock.read()
+        if self._readonly:
+            return
+        else:
+            return self._lock.read()
 
     def _write(self):
-        return self._lock.write()
+        if self._readonly:
+            raise IOError("Can't perform write operations in readonly mode.")
+        else:
+            return self._lock.write()
 
     def _master_write(self):
-        return self._lock.single_write()
+        if self._readonly:
+            raise IOError("Can't perform write operations in readonly mode.")
+        else:
+            return self._lock.single_write()
 
     def _handle(self, mode):
-        return h5py.File(self._root, mode)
+        if self._readonly and mode != "r":
+            raise IOError("Can't perform write operations in readonly mode.")
+        else:
+            return h5py.File(self._root, mode)
 
     def exists(self):
         return os.path.exists(self._root)
@@ -152,6 +166,24 @@ class HDF5Engine(Engine):
             handle.require_group("connectivity")
             del handle["connectivity"]
             handle.require_group("connectivity")
+
+    def get_chunk_stats(self):
+        with self._handle("r") as handle:
+            return json.loads(handle.attrs["chunks"])
+
+    def read_only(self):
+        return ReadOnlyManager(self)
+
+
+class ReadOnlyManager:
+    def __init__(self, engine):
+        self._e = engine
+
+    def __enter__(self):
+        self._e._readonly = True
+
+    def __exit__(self, *args):
+        self._e._readonly = False
 
 
 def _get_default_root():
