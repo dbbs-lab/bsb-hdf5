@@ -60,8 +60,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 g = h.create_group(path)
                 g.attrs["pre"] = pre_type.name
                 g.attrs["post"] = post_type.name
-                g.require_group(path + "/inc")
-                g.require_group(path + "/out")
+                g.require_group(f"{path}/inc")
+                g.require_group(f"{path}/out")
         cs = cls(engine, tag)
         cs.pre = pre_type
         cs.post = post_type
@@ -362,11 +362,11 @@ class ConnectivitySet(Resource, IConnectivitySet):
           Tuple[numpy.ndarray, numpy.ndarray]]
         """
         itr = CSIterator(self, direction, local_, global_)
-        for dir in itr.get_dir_iter(direction):
-            for lchunk in itr.get_local_iter(dir, local_):
-                for gchunk in itr.get_global_iter(dir, lchunk, global_):
-                    conns = self.load_block_connections(dir, lchunk, gchunk)
-                    yield (dir, lchunk, gchunk, conns)
+        for direction in itr.get_dir_iter(direction):
+            for lchunk in itr.get_local_iter(direction, local_):
+                for gchunk in itr.get_global_iter(direction, lchunk, global_):
+                    conns = self.load_block_connections(direction, lchunk, gchunk)
+                    yield direction, lchunk, gchunk, conns
 
     @handles_handles("r")
     def load_block_connections(self, direction, local_, global_, handle=HANDLED):
@@ -416,32 +416,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         global_locs = local_grp["global_locs"][()]
         chunks, ptrs = self._get_sorted_pointers(local_grp)
         col = np.repeat([c.id for c in chunks], np.diff(ptrs, append=len(global_locs)))
-        return (local_grp["local_locs"][()], col, global_locs)
-
-    @handles_handles("r")
-    def load_connections(self, direction="out", handle=HANDLED):
-        """
-        Load all connections. Careful, may lead to out of memory errors for large
-        connection sets.
-
-        :param direction: Incoming or outgoing perspective.
-        :type direction: str
-        """
-        chunks = self.get_local_chunks(direction, handle=handle)
-        locals = []
-        cids = []
-        globals = []
-        for chunk in chunks:
-            lcl, cid, gbl = self.load_local_connections(direction, chunk, handle=handle)
-            locals.append(lcl)
-            cids.append(cid)
-            globals.append(gbl)
-
-        lcids = np.repeat([c.id for c in chunks], [len(len_) for len_ in locals])
-        local_ = _better_than_concat(locals, 3, int)
-        global_ = _better_than_concat(globals, 3, int)
-        gcids = _better_than_concat(cids, 1, int)
-        return lcids, local_, gcids, global_
+        return local_grp["local_locs"][()], col, global_locs
 
 
 def _better_than_concat(arrs, cols, dtype):
@@ -465,8 +440,11 @@ class CSIterator:
     def __iter__(self):
         if self._dir is None:
             yield from (
-                (dir, CSIterator(self._cs, dir, self._lchunks, self._gchunks))
-                for dir in self.get_dir_iter(self._dir)
+                (
+                    direction,
+                    CSIterator(self._cs, direction, self._lchunks, self._gchunks),
+                )
+                for direction in self.get_dir_iter(self._dir)
             )
         elif not isinstance(self._lchunks, Chunk):
             yield from (
@@ -486,23 +464,20 @@ class CSIterator:
         else:
             yield self._cs.load_block_connections(self._dir, self._lchunks, self._gchunks)
 
-    def get_dir_iter(self, dir):
-        if dir is None:
-            return ("inc", "out")
-        else:
-            return (dir,)
+    def get_dir_iter(self, direction):
+        return ("inc", "out") if direction is None else (direction,)
 
-    def get_local_iter(self, dir, local_):
+    def get_local_iter(self, direction, local_):
         if local_ is None:
-            return self._cs.get_local_chunks(dir)
+            return self._cs.get_local_chunks(direction)
         elif isinstance(local_, Chunk):
             return (local_,)
         else:
             return iter(local_)
 
-    def get_global_iter(self, dir, local_, global_):
+    def get_global_iter(self, direction, local_, global_):
         if global_ is None:
-            return self._cs.get_global_chunks(dir, local_)
+            return self._cs.get_global_chunks(direction, local_)
         elif isinstance(global_, Chunk):
             return (global_,)
         else:
