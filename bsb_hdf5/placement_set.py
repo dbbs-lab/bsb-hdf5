@@ -356,7 +356,7 @@ class PlacementSet(
         for chunk in self.get_loaded_chunks():
             with self.chunk_context(chunk):
                 len_ = len(self)
-                yield (chunk, slice(ctr, ctr := ctr + len_))
+                yield chunk, slice(ctr, ctr := ctr + len_)
 
     def _demux(self, ids):
         """
@@ -387,15 +387,18 @@ class PlacementSet(
         chunk_stats[str(chunk.id)] = chunk_stats.get(str(chunk.id), 0) + count
         handle[self._path].attrs["chunks"] = json.dumps(chunk_stats)
 
+    @handles_handles("r")
+    def get_chunk_stats(self, handle=HANDLED):
+        return json.loads(handle[self._path].attrs["chunks"])
+
 
 def encode_labels(data, ds):
     if ds is None:
         return EncodedLabels.none(len(data))
-    else:
-        ps_group = ds.parent.parent.parent
-        serialized = json.dumps(EncodedLabels.none(1).labels, default=list)
-        labels = json.loads(ps_group.attrs.get("labelsets", serialized))
-        return EncodedLabels(shape=data.shape, buffer=data, labels=labels)
+    ps_group = ds.parent.parent.parent
+    serialized = json.dumps(EncodedLabels.none(1).labels, default=list)
+    labels = json.loads(ps_group.attrs.get("labelsets", serialized))
+    return EncodedLabels(shape=data.shape, buffer=data, labels=labels)
 
 
 class LabellingException(Exception):
