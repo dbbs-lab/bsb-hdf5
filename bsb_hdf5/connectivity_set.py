@@ -362,7 +362,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
           Tuple[numpy.ndarray, numpy.ndarray]]
         """
         itr = CSIterator(self, direction, local_, global_)
-        for direction in itr.get_dir_iter(direction):
+        for direction in get_dir_iter(direction):
             for lchunk in itr.get_local_iter(direction, local_):
                 for gchunk in itr.get_global_iter(direction, lchunk, global_):
                     conns = self.load_block_connections(direction, lchunk, gchunk)
@@ -381,6 +381,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type local_: ~bsb.storage.Chunk
         :param global_: Global chunk
         :type global_: ~bsb.storage.Chunk
+        :param handle: This parameter is injected and doesn't have to be passed.
         :returns: The local and global connections locations
         :rtype: Tuple[numpy.ndarray, numpy.ndarray]
         """
@@ -404,8 +405,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type direction: str
         :param local_: Local chunk
         :type local_: ~bsb.storage.Chunk
-        :param global_: Global chunk
-        :type global_: ~bsb.storage.Chunk
+        :param handle: This parameter is injected and doesn't have to be passed.
         :returns: The local connection locations, a vector of the global connection chunks
           (1 chunk id per connection) and the global connections locations. To identify a
           cell in the global connections, use the corresponding chunk id from the second
@@ -430,6 +430,10 @@ def _better_than_concat(arrs, cols, dtype):
     return cat
 
 
+def get_dir_iter(direction):
+    return ("inc", "out") if direction is None else (direction,)
+
+
 class CSIterator:
     def __init__(self, cs, direction=None, local_=None, global_=None):
         self._cs = cs
@@ -444,7 +448,7 @@ class CSIterator:
                     direction,
                     CSIterator(self._cs, direction, self._lchunks, self._gchunks),
                 )
-                for direction in self.get_dir_iter(self._dir)
+                for direction in get_dir_iter(self._dir)
             )
         elif not isinstance(self._lchunks, Chunk):
             yield from (
@@ -463,9 +467,6 @@ class CSIterator:
             )
         else:
             yield self._cs.load_block_connections(self._dir, self._lchunks, self._gchunks)
-
-    def get_dir_iter(self, direction):
-        return ("inc", "out") if direction is None else (direction,)
 
     def get_local_iter(self, direction, local_):
         if local_ is None:
