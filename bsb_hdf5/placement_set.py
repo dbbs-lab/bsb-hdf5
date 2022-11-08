@@ -4,7 +4,7 @@ from bsb.exceptions import (
     DatasetNotFoundError,
 )
 from bsb import config
-from bsb.storage import Chunk
+from bsb.storage._chunks import Chunk, chunklist
 from bsb._encoding import EncodedLabels
 from bsb.storage.interfaces import PlacementSet as IPlacementSet
 from bsb.morphologies import MorphologySet, RotationSet
@@ -14,7 +14,6 @@ from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
 import numpy as np
 import itertools
 import json
-
 
 _root = "/placement/"
 

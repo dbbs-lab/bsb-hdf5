@@ -1,6 +1,6 @@
 from bsb.exceptions import DatasetNotFoundError
 from .resource import Resource, handles_handles, HANDLED
-from bsb.storage._chunks import Chunk
+from bsb.storage._chunks import Chunk, chunklist
 from bsb.storage.interfaces import ConnectivitySet as IConnectivitySet
 import numpy as np
 import json
@@ -295,14 +295,16 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @handles_handles("r")
     def get_local_chunks(self, direction, handle=HANDLED):
-        return [Chunk.from_id(int(k), None) for k in handle[self._path][direction].keys()]
+        return chunklist(
+            Chunk.from_id(int(k), None) for k in handle[self._path][direction].keys()
+        )
 
     @handles_handles("r")
     def get_global_chunks(self, direction, local_, handle=HANDLED):
-        return [
+        return chunklist(
             Chunk(k, None)
             for k in handle[self._path][f"{direction}/{local_.id}"].attrs["chunk_list"]
-        ]
+        )
 
     def nested_iter_connections(self, direction=None, local_=None, global_=None):
         """
@@ -438,8 +440,8 @@ class CSIterator:
     def __init__(self, cs, direction=None, local_=None, global_=None):
         self._cs = cs
         self._dir = direction
-        self._lchunks = local_
-        self._gchunks = global_
+        self._lchunks = chunklist(local_) if local_ is not None else None
+        self._gchunks = chunklist(global_) if local_ is not None else None
 
     def __iter__(self):
         if self._dir is None:
@@ -483,8 +485,3 @@ class CSIterator:
             return (global_,)
         else:
             return iter(global_)
-
-
-def _sort_triple(a, b):
-    # Comparator for chunks by bitshift and sum of the coords.
-    return (a[0] << 42 + a[1] << 21 + a[2]) > (b[0] << 42 + b[1] << 21 + b[2])

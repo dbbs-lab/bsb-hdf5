@@ -9,7 +9,7 @@ ConnectivitySet) to organize :class:`.ChunkedProperty` and :class:`.ChunkedColle
 objects within them.
 """
 
-from bsb.storage._chunks import Chunk
+from bsb.storage._chunks import Chunk, chunklist
 import numpy as np
 import contextlib
 from .resource import handles_handles, HANDLED
@@ -50,20 +50,20 @@ class ChunkLoader:
         else:
             return self._chunks.copy()
 
-    def get_all_chunks(self):
-        with self._engine._read():
-            with self._engine._handle("r") as h:
-                chunks = list(h[self._path].keys())
-                if chunks:
-                    # If any chunks have been written, this HDF5 file is tagged with a
-                    # chunk size
-                    size = self._get_chunk_size(h)
-        return [Chunk.from_id(int(c), size) for c in chunks]
+    @handles_handles("r")
+    def get_all_chunks(self, handle=HANDLED):
+        chunks = list(handle[self._path].keys())
+        size = None
+        if chunks:
+            # If any chunks have been written, this HDF5 file is tagged with a
+            # chunk size
+            size = self._get_chunk_size(handle)
+        return chunklist(Chunk.from_id(int(c), size) for c in chunks)
 
     @contextlib.contextmanager
     def chunk_context(self, *chunks):
         old_chunks = self._chunks
-        self._chunks = set(chunks)
+        self._chunks = chunklist(chunks)
         yield
         self._chunks = old_chunks
 
@@ -89,20 +89,20 @@ class ChunkLoader:
         """
         Include a chunk in the data when loading properties/collections.
         """
-        self._chunks.add(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
+        self._chunks.append(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
+        self._chunks.sort()
 
     def exclude_chunk(self, chunk):
         """
         Exclude a chunk from the data when loading properties/collections.
         """
-        self._chunks.discard(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
+        self._chunks.remove(chunk if isinstance(chunk, Chunk) else Chunk(chunk, None))
 
     def set_chunk_filter(self, chunks):
-        chunks = _to_chunklist(chunks)
-        self._chunks = set(chunks)
+        self._chunks = chunklist(chunks)
 
     def clear_chunk_filter(self):
-        self._chunks = set()
+        self._chunks = []
 
     @handles_handles("a")
     def require_chunk(self, chunk, handle=HANDLED):
@@ -140,10 +140,6 @@ class ChunkLoader:
         return handle.attrs["chunk_size"]
 
 
-def _to_chunklist(chunks):
-    return [c if isinstance(c, Chunk) else Chunk(c, None) for c in chunks]
-
-
 # The ChunkedProperty and ChunkedCollection are a bit fucked in terms of inheritance and
 # how they handle their polymorphism...
 class ChunkedProperty:
@@ -169,10 +165,7 @@ class ChunkedProperty:
 
     @handles_handles("r", lambda self: self.loader._engine)
     def load(self, raw=False, key=None, pad_by=None, handle=HANDLED):
-        if self.loader._chunks:
-            chunks = self.loader._chunks
-        else:
-            chunks = self.loader.get_all_chunks()
+        chunks = self.loader.get_loaded_chunks()
         reader = self.get_chunk_reader(handle, raw, key, pad_by=pad_by)
         # Read and collect all non empty chunks
         chunked_data = tuple(data for c in chunks if (data := reader(c)).size)
@@ -183,7 +176,7 @@ class ChunkedProperty:
                 return self.extract(data, None)
             else:
                 return data
-        # Allow custom arrays with concatenate methods to concatenate themselves.
+        # Allow custom ndarrays with concatenate methods to concatenate themselves.
         if concatenator := getattr(chunked_data[0].__class__, "concatenate", None):
             return concatenator(*chunked_data)
         else:
@@ -220,6 +213,7 @@ class ChunkedProperty:
         """
         Append data to a property chunk. Will create it if it doesn't exist.
 
+        :param data: Data to append to the chunked property.
         :param chunk: Chunk
         :type chunk: :class:`bsb.storage.Chunk`
         """
