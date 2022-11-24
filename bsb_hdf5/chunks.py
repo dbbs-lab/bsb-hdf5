@@ -273,18 +273,39 @@ class ChunkedCollection(ChunkedProperty):
         super().__init__(loader, None, shape, dtype, insert, extract, collection)
 
     @handles_handles("r", lambda self: self.loader._engine)
+    def keys(self, handle=HANDLED):
+        try:
+            return handle[self.loader._path].attrs[f"{self.collection}_keys"]
+        except KeyError:
+            return []
+
+    @handles_handles("r", lambda self: self.loader._engine)
     def load(self, key, handle=HANDLED, **kwargs):
         return super().load(key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
     def append(self, chunk, data, key, handle=HANDLED, **kwargs):
+        self._add_key(key)
         return super().append(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
     def overwrite(self, chunk, data, key, handle=HANDLED, **kwargs):
+        self._add_key(key)
         return super().overwrite(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
     def clear(self, chunk, handle=HANDLED):
         del handle[self._chunk_path(chunk)]
         handle.create_group(self._chunk_path(chunk))
+
+    @handles_handles("a", lambda self: self.loader._engine)
+    def _add_key(self, key, handle=HANDLED):
+        keys = self.keys(handle=handle)
+        keys.append(key)
+        handle[self.loader._path].attrs[f"{self.collection}_keys"] = keys
+
+    @handles_handles("r", lambda self: self.loader._engine)
+    def load_all(self, handle=HANDLED, **kwargs):
+        return {
+            key: super().load(key=key, handle=handle, **kwargs) for key in self.keys()
+        }
