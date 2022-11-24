@@ -441,7 +441,7 @@ class CSIterator:
         self._cs = cs
         self._dir = direction
         self._lchunks = chunklist(local_) if local_ is not None else None
-        self._gchunks = chunklist(global_) if local_ is not None else None
+        self._gchunks = chunklist(global_) if global_ is not None else None
 
     def __iter__(self):
         if self._dir is None:
