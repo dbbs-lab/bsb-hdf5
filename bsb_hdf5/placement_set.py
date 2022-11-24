@@ -73,7 +73,7 @@ class PlacementSet(
         self._labels = None
         self._morphology_labels = None
         if not self.exists(engine, cell_type):
-            raise DatasetNotFoundError("PlacementSet '{}' does not exist".format(tag))
+            raise DatasetNotFoundError(f"PlacementSet '{tag}' does not exist")
 
     @classmethod
     def create(cls, engine, cell_type):
@@ -161,6 +161,10 @@ class PlacementSet(
             data,
             labels=self._morphology_labels,
         )
+
+    @handles_handles("r")
+    def load_additional(self, handle=HANDLED):
+        return self._additional_chunks.load_all()
 
     @handles_handles("r")
     def _get_morphology_loaders(self, handle=HANDLED):
@@ -255,19 +259,7 @@ class PlacementSet(
         self.append_data(chunk, count=count, additional=additional)
 
     def append_additional(self, name, chunk, data):
-        with self._engine._write():
-            self.require_chunk(chunk)
-            path = self.get_chunk_path(chunk) + "/additional/" + name
-            with self._engine._handle("a") as f:
-                if path not in f:
-                    maxshape = list(data.shape)
-                    maxshape[0] = None
-                    f.create_dataset(path, data=data, maxshape=tuple(maxshape))
-                else:
-                    dset = f[path]
-                    start_pos = dset.shape[0]
-                    dset.resize(start_pos + len(data), axis=0)
-                    dset[start_pos:] = data
+        self._additional_chunks.append(chunk, name, data)
 
     @handles_handles("a")
     def label_by_mask(self, mask, labels, handle=HANDLED):
