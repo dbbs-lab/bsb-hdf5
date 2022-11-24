@@ -12,7 +12,7 @@ import os
 import shutil
 import shortuuid
 
-__version__ = "0.4.4"
+__version__ = "0.5"
 __all__ = [
     "PlacementSet",
     "ConnectivitySet",
@@ -74,6 +74,14 @@ def _set_active_cfg(self, config):
     config._meta["active_config"] = True
 
 
+class NoopLock:
+    def __enter__(self):
+        return True
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return True
+
+
 class HDF5Engine(Engine):
     def __init__(self, root, comm):
         super().__init__(root, comm)
@@ -99,7 +107,7 @@ class HDF5Engine(Engine):
 
     def _read(self):
         if self._readonly:
-            return
+            return NoopLock()
         else:
             return self._lock.read()
 
