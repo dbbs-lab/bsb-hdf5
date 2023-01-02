@@ -76,10 +76,10 @@ def _set_active_cfg(self, config):
 
 class NoopLock:
     def __enter__(self):
-        return True
+        pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        return True
+        pass
 
 
 class HDF5Engine(Engine):
@@ -167,6 +167,7 @@ class HDF5Engine(Engine):
             handle.require_group("placement")
             del handle["placement"]
             handle.require_group("placement")
+            self._write_chunk_stats(handle, {})
 
     @on_main()
     def clear_connectivity(self):
@@ -174,10 +175,22 @@ class HDF5Engine(Engine):
             handle.require_group("connectivity")
             del handle["connectivity"]
             handle.require_group("connectivity")
+            stats = self._read_chunk_stats(handle)
+            stats = {
+                k: {"placed": v["placed"], "connections": {"inc": 0, "out": 0}}
+                for k, v in stats.items()
+            }
+            self._write_chunk_stats(handle, stats)
 
     def get_chunk_stats(self):
         with self._handle("r") as handle:
-            return json.loads(handle.attrs["chunks"])
+            return self._read_chunk_stats(handle)
+
+    def _read_chunk_stats(self, handle: h5py.File) -> object:
+        return json.loads(handle.attrs.get("chunks", "{}"))
+
+    def _write_chunk_stats(self, handle, stats):
+        handle.attrs["chunks"] = json.dumps(stats)
 
     def read_only(self):
         return ReadOnlyManager(self)
