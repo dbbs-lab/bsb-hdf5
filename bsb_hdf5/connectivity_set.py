@@ -1,3 +1,4 @@
+import errr
 from bsb.exceptions import DatasetNotFoundError
 from .resource import Resource, handles_handles, HANDLED
 from bsb.storage._chunks import Chunk, chunklist
@@ -30,7 +31,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
         with engine._read():
             with engine._handle("r") as h:
                 if not self.exists(engine, tag, handle=h):
-                    raise DatasetNotFoundError(f"ConnectivitySet '{tag}' does not exist")
+                    raise DatasetNotFoundError(
+                        f"ConnectivitySet '{tag}' does not exist. Choose from: "
+                        + errr.quotejoin(self.get_tags(self._engine))
+                    )
                 self._pre_name = h[self._path].attrs["pre"]
                 self._post_name = h[self._path].attrs["post"]
 
@@ -275,23 +279,26 @@ class ConnectivitySet(Resource, IConnectivitySet):
         gbl_ds[eptr:] = gbl_end
 
     def _track_add(self, handle, src_chunk, dst_chunk, count):
+        # Track addition in global chunk stats
+        global_stats = self._engine._read_chunk_stats(handle)
         for tag, chunk in (("inc", dst_chunk), ("out", src_chunk)):
             id = str(chunk.id)
-            # Track addition in global chunk stats
-            global_stats = json.loads(handle.attrs.get("chunks", "{}"))
-            stats = global_stats.setdefault(
+            chunk_stats = global_stats.setdefault(
                 id, {"placed": 0, "connections": {"inc": 0, "out": 0}}
             )
-            stats["connections"][tag] += count
-            handle.attrs["chunks"] = json.dumps(global_stats)
+            chunk_stats["connections"][tag] += count
             # Track addition in connectivity set
             group = handle[self._path]
             if tag == "out":
                 group.attrs["len"] = group.attrs.get("len", 0) + count
-            chunk_stats = json.loads(group.attrs.get("chunks", "{}"))
-            stats = chunk_stats.setdefault(id, {"inc": 0, "out": 0})
-            stats[tag] += count
-            group.attrs["chunks"] = json.dumps(chunk_stats)
+            conn_stats = json.loads(group.attrs.get("chunks", "{}"))
+            conn_stats.setdefault(id, {"inc": 0, "out": 0})[tag] += count
+            group.attrs["chunks"] = json.dumps(conn_stats)
+        self._engine._write_chunk_stats(handle, global_stats)
+
+    @handles_handles("r")
+    def get_chunk_stats(self, handle=HANDLED):
+        return json.loads(handle[self._path].attrs.get("chunks", "{}"))
 
     @handles_handles("r")
     def get_local_chunks(self, direction, handle=HANDLED):
