@@ -24,8 +24,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     def __init__(self, engine, tag):
         self.tag = tag
-        self.pre = None
-        self.post = None
+        self.pre_type = None
+        self.post_type = None
         super().__init__(engine, _root + tag)
         with engine._read():
             with engine._handle("r") as h:
@@ -63,8 +63,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 g.require_group(f"{path}/inc")
                 g.require_group(f"{path}/out")
         cs = cls(engine, tag)
-        cs.pre = pre_type
-        cs.post = post_type
+        cs.pre_type = pre_type
+        cs.post_type = post_type
         return cs
 
     @staticmethod
@@ -129,8 +129,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 g.require_group(path + "/inc")
                 g.require_group(path + "/out")
         cs = cls(engine, tag)
-        cs.pre = pre_type
-        cs.post = post_type
+        cs.pre_type = pre_type
+        cs.post_type = post_type
         return cs
 
     def clear(self):
