@@ -249,7 +249,7 @@ class PlacementSet(
         self._track_add(handle, chunk, len(positions))
 
     def _append_morphologies(self, chunk, new_set):
-        with self.chunk_context(chunk):
+        with self.chunk_context([chunk]):
             morphology_set = self.load_morphologies(allow_empty=True).merge(new_set)
             self._set_morphology_loaders(morphology_set._serialize_loaders())
             self._morphology_chunks.clear(chunk)
@@ -345,7 +345,7 @@ class PlacementSet(
         """
         ctr = 0
         for chunk in self.get_loaded_chunks():
-            with self.chunk_context(chunk):
+            with self.chunk_context([chunk]):
                 len_ = len(self)
                 yield chunk, slice(ctr, ctr := ctr + len_)
 
@@ -356,7 +356,7 @@ class PlacementSet(
             This function sets the chunk context for as long as it iterates.
         """
         for chunk in self.get_loaded_chunks():
-            with self.chunk_context(chunk):
+            with self.chunk_context([chunk]):
                 ln = len(self)
                 idx = ids < ln
                 block = ids[idx]

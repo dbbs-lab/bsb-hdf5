@@ -61,7 +61,7 @@ class ChunkLoader:
         return chunklist(Chunk.from_id(int(c), size) for c in chunks)
 
     @contextlib.contextmanager
-    def chunk_context(self, *chunks):
+    def chunk_context(self, chunks):
         old_chunks = self._chunks
         self._chunks = chunklist(chunks)
         yield

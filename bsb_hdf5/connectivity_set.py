@@ -158,13 +158,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
         src_chunks = pre.get_loaded_chunks()
         lns = []
         for src in iter(src_chunks):
-            with pre.chunk_context(src):
+            with pre.chunk_context([src]):
                 lns.append(len(pre))
         dmax = 0
         # Iterate over each source chunk
         for dst in post.get_loaded_chunks():
             # Count the number of cells
-            with post.chunk_context(dst):
+            with post.chunk_context([dst]):
                 ln = len(post)
             dst_idx = dst_locs[:, 0] < ln
             dst_block = dst_locs[dst_idx]
