@@ -382,6 +382,23 @@ class PlacementSet(
     def get_chunk_stats(self, handle=HANDLED):
         return json.loads(handle[self._path].attrs["chunks"])
 
+    @handles_handles("r")
+    def load_ids(self, handle=HANDLED):
+        if self._chunks is None:
+            return np.arange(len(self))
+        stats = self.get_chunk_stats(handle)
+        offsets = {}
+        ctr = 0
+        return np.concatenate(
+            [
+                np.arange(ctr, (ctr := ctr + len_))
+                for chunk, len_ in sorted(
+                    stats.items(), key=lambda k: Chunk.from_id(int(k[0]), None).id
+                )
+                if chunk in self._chunks
+            ]
+        )
+
 
 def encode_labels(data, ds):
     if ds is None:
