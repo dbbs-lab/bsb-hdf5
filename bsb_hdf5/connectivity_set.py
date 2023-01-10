@@ -1,8 +1,10 @@
+import errr
 from bsb.exceptions import DatasetNotFoundError
 from .resource import Resource, handles_handles, HANDLED
-from bsb.storage._chunks import Chunk
+from bsb.storage._chunks import Chunk, chunklist
 from bsb.storage.interfaces import ConnectivitySet as IConnectivitySet
 import numpy as np
+import json
 
 _root = "/connectivity/"
 
@@ -23,13 +25,16 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     def __init__(self, engine, tag):
         self.tag = tag
-        self.pre = None
-        self.post = None
+        self.pre_type = None
+        self.post_type = None
         super().__init__(engine, _root + tag)
         with engine._read():
             with engine._handle("r") as h:
                 if not self.exists(engine, tag, handle=h):
-                    raise DatasetNotFoundError(f"ConnectivitySet '{tag}' does not exist")
+                    raise DatasetNotFoundError(
+                        f"ConnectivitySet '{tag}' does not exist. Choose from: "
+                        + errr.quotejoin(self.get_tags(self._engine))
+                    )
                 self._pre_name = h[self._path].attrs["pre"]
                 self._post_name = h[self._path].attrs["post"]
 
@@ -59,11 +64,11 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 g = h.create_group(path)
                 g.attrs["pre"] = pre_type.name
                 g.attrs["post"] = post_type.name
-                g.require_group(path + "/inc")
-                g.require_group(path + "/out")
+                g.require_group(f"{path}/inc")
+                g.require_group(f"{path}/out")
         cs = cls(engine, tag)
-        cs.pre = pre_type
-        cs.post = post_type
+        cs.pre_type = pre_type
+        cs.post_type = post_type
         return cs
 
     @staticmethod
@@ -128,8 +133,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 g.require_group(path + "/inc")
                 g.require_group(path + "/out")
         cs = cls(engine, tag)
-        cs.pre = pre_type
-        cs.post = post_type
+        cs.pre_type = pre_type
+        cs.post_type = post_type
         return cs
 
     def clear(self):
@@ -157,13 +162,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
         src_chunks = pre.get_loaded_chunks()
         lns = []
         for src in iter(src_chunks):
-            with pre.chunk_context(src):
+            with pre.chunk_context([src]):
                 lns.append(len(pre))
         dmax = 0
         # Iterate over each source chunk
         for dst in post.get_loaded_chunks():
             # Count the number of cells
-            with post.chunk_context(dst):
+            with post.chunk_context([dst]):
                 ln = len(post)
             dst_idx = dst_locs[:, 0] < ln
             dst_block = dst_locs[dst_idx]
@@ -173,7 +178,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
                 yield src, dst, src_block[block_idx], dst_block[block_idx]
             else:
                 for src, sln in zip(iter(src_chunks), lns):
-                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < ln)
+                    block_idx = (src_block[:, 0] >= 0) & (src_block[:, 0] < sln)
                     yield src, dst, src_block[block_idx], dst_block[block_idx]
                     src_block[:, 0] -= sln
             dst_locs = dst_locs[~dst_idx]
@@ -240,6 +245,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
             raise ValueError("Location matrices must be of same length.")
         self._insert("inc", dst_chunk, src_chunk, dst_locs, src_locs, handle)
         self._insert("out", src_chunk, dst_chunk, src_locs, dst_locs, handle)
+        self._track_add(handle, src_chunk, dst_chunk, len(src_locs))
 
     def _insert(self, tag, local_, global_, lloc, gloc, handle):
         grp = handle.require_group(f"{self._path}/{tag}/{local_.id}")
@@ -272,16 +278,40 @@ class ConnectivitySet(Resource, IConnectivitySet):
         gbl_ds[iptr:eptr] = np.concatenate((gbl_ds[iptr : (eptr - new_rows)], gloc))
         gbl_ds[eptr:] = gbl_end
 
+    def _track_add(self, handle, src_chunk, dst_chunk, count):
+        # Track addition in global chunk stats
+        global_stats = self._engine._read_chunk_stats(handle)
+        for tag, chunk in (("inc", dst_chunk), ("out", src_chunk)):
+            id = str(chunk.id)
+            chunk_stats = global_stats.setdefault(
+                id, {"placed": 0, "connections": {"inc": 0, "out": 0}}
+            )
+            chunk_stats["connections"][tag] += count
+            # Track addition in connectivity set
+            group = handle[self._path]
+            if tag == "out":
+                group.attrs["len"] = group.attrs.get("len", 0) + count
+            conn_stats = json.loads(group.attrs.get("chunks", "{}"))
+            conn_stats.setdefault(id, {"inc": 0, "out": 0})[tag] += count
+            group.attrs["chunks"] = json.dumps(conn_stats)
+        self._engine._write_chunk_stats(handle, global_stats)
+
+    @handles_handles("r")
+    def get_chunk_stats(self, handle=HANDLED):
+        return json.loads(handle[self._path].attrs.get("chunks", "{}"))
+
     @handles_handles("r")
     def get_local_chunks(self, direction, handle=HANDLED):
-        return [Chunk.from_id(int(k), None) for k in handle[self._path][direction].keys()]
+        return chunklist(
+            Chunk.from_id(int(k), None) for k in handle[self._path][direction].keys()
+        )
 
     @handles_handles("r")
     def get_global_chunks(self, direction, local_, handle=HANDLED):
-        return [
+        return chunklist(
             Chunk(k, None)
             for k in handle[self._path][f"{direction}/{local_.id}"].attrs["chunk_list"]
-        ]
+        )
 
     def nested_iter_connections(self, direction=None, local_=None, global_=None):
         """
@@ -341,11 +371,11 @@ class ConnectivitySet(Resource, IConnectivitySet):
           Tuple[numpy.ndarray, numpy.ndarray]]
         """
         itr = CSIterator(self, direction, local_, global_)
-        for dir in itr.get_dir_iter(direction):
-            for lchunk in itr.get_local_iter(dir, local_):
-                for gchunk in itr.get_global_iter(dir, lchunk, global_):
-                    conns = self.load_block_connections(dir, lchunk, gchunk)
-                    yield (dir, lchunk, gchunk, conns)
+        for direction in get_dir_iter(direction):
+            for lchunk in itr.get_local_iter(direction, local_):
+                for gchunk in itr.get_global_iter(direction, lchunk, global_):
+                    conns = self.load_block_connections(direction, lchunk, gchunk)
+                    yield direction, lchunk, gchunk, conns
 
     @handles_handles("r")
     def load_block_connections(self, direction, local_, global_, handle=HANDLED):
@@ -360,6 +390,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type local_: ~bsb.storage.Chunk
         :param global_: Global chunk
         :type global_: ~bsb.storage.Chunk
+        :param handle: This parameter is injected and doesn't have to be passed.
         :returns: The local and global connections locations
         :rtype: Tuple[numpy.ndarray, numpy.ndarray]
         """
@@ -383,8 +414,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type direction: str
         :param local_: Local chunk
         :type local_: ~bsb.storage.Chunk
-        :param global_: Global chunk
-        :type global_: ~bsb.storage.Chunk
+        :param handle: This parameter is injected and doesn't have to be passed.
         :returns: The local connection locations, a vector of the global connection chunks
           (1 chunk id per connection) and the global connections locations. To identify a
           cell in the global connections, use the corresponding chunk id from the second
@@ -395,32 +425,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         global_locs = local_grp["global_locs"][()]
         chunks, ptrs = self._get_sorted_pointers(local_grp)
         col = np.repeat([c.id for c in chunks], np.diff(ptrs, append=len(global_locs)))
-        return (local_grp["local_locs"][()], col, global_locs)
-
-    @handles_handles("r")
-    def load_connections(self, direction="out", handle=HANDLED):
-        """
-        Load all connections. Careful, may lead to out of memory errors for large
-        connection sets.
-
-        :param direction: Incoming or outgoing perspective.
-        :type direction: str
-        """
-        chunks = self.get_local_chunks(direction, handle=handle)
-        locals = []
-        cids = []
-        globals = []
-        for chunk in chunks:
-            lcl, cid, gbl = self.load_local_connections(direction, chunk, handle=handle)
-            locals.append(lcl)
-            cids.append(cid)
-            globals.append(gbl)
-
-        lcids = np.repeat([c.id for c in chunks], [len(len_) for len_ in locals])
-        local_ = _better_than_concat(locals, 3, int)
-        global_ = _better_than_concat(globals, 3, int)
-        gcids = _better_than_concat(cids, 1, int)
-        return lcids, local_, gcids, global_
+        return local_grp["local_locs"][()], col, global_locs
 
 
 def _better_than_concat(arrs, cols, dtype):
@@ -434,6 +439,10 @@ def _better_than_concat(arrs, cols, dtype):
     return cat
 
 
+def get_dir_iter(direction):
+    return ("inc", "out") if direction is None else (direction,)
+
+
 class CSIterator:
     def __init__(self, cs, direction=None, local_=None, global_=None):
         self._cs = cs
@@ -444,8 +453,11 @@ class CSIterator:
     def __iter__(self):
         if self._dir is None:
             yield from (
-                (dir, CSIterator(self._cs, dir, self._lchunks, self._gchunks))
-                for dir in self.get_dir_iter(self._dir)
+                (
+                    direction,
+                    CSIterator(self._cs, direction, self._lchunks, self._gchunks),
+                )
+                for direction in get_dir_iter(self._dir)
             )
         elif not isinstance(self._lchunks, Chunk):
             yield from (
@@ -465,29 +477,18 @@ class CSIterator:
         else:
             yield self._cs.load_block_connections(self._dir, self._lchunks, self._gchunks)
 
-    def get_dir_iter(self, dir):
-        if dir is None:
-            return ("inc", "out")
-        else:
-            return (dir,)
-
-    def get_local_iter(self, dir, local_):
+    def get_local_iter(self, direction, local_):
         if local_ is None:
-            return self._cs.get_local_chunks(dir)
+            return self._cs.get_local_chunks(direction)
         elif isinstance(local_, Chunk):
             return (local_,)
         else:
-            return iter(local_)
+            return iter(chunklist(local_))
 
-    def get_global_iter(self, dir, local_, global_):
+    def get_global_iter(self, direction, local_, global_):
         if global_ is None:
-            return self._cs.get_global_chunks(dir, local_)
+            return self._cs.get_global_chunks(direction, local_)
         elif isinstance(global_, Chunk):
             return (global_,)
         else:
-            return iter(global_)
-
-
-def _sort_triple(a, b):
-    # Comparator for chunks by bitshift and sum of the coords.
-    return (a[0] << 42 + a[1] << 21 + a[2]) > (b[0] << 42 + b[1] << 21 + b[2])
+            return iter(chunklist(global_))

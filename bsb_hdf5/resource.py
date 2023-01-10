@@ -1,8 +1,12 @@
+import typing
+
 import numpy as np
 import h5py
 import inspect
 import functools
 
+if typing.TYPE_CHECKING:
+    from . import HDF5Engine as Engine
 
 # Semantic marker for things that get injected
 HANDLED = None
@@ -16,11 +20,12 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
         sig = inspect.signature(f)
         if "handle" not in sig.parameters:
             raise ValueError(
-                f"`{f.__module__}.{f.__name__}` needs handle to be handled by handles_handles. Clearly."
+                f"`{f.__module__}.{f.__name__}` needs handle to be handled by "
+                f"handles_handles. Clearly."
             )
 
         @functools.wraps(f)
-        def decorated(self, *args, handle=None, **kwargs):
+        def handle_indirection(self, *args, handle=None, **kwargs):
             engine = handler(self)
             lock = lock_f(engine)
             try:
@@ -40,14 +45,14 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
             else:
                 return f(*bound.args, **bound.kwargs)
 
-        return decorated
+        return handle_indirection
 
     return decorator
 
 
 class Resource:
-    def __init__(self, engine, path):
-        self._engine = engine
+    def __init__(self, engine: "Engine", path: str):
+        self._engine: "Engine" = engine
         self._path = path
 
     def __eq__(self, other):
