@@ -32,7 +32,7 @@ class ChunkLoader:
         cls._collections = list(collections)
 
     def __init__(self):
-        self._chunks = set()
+        self._chunks = []
         self._properties = []
         self._collections = []
         for prop_constr in self.__class__._properties:
