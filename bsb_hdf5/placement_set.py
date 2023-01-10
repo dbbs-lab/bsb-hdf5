@@ -40,21 +40,25 @@ class _MapSelector(MorphologySelector):
         return name in self._names
 
 
+_ps_properties = (
+    lambda loader: ChunkedProperty(loader, "position", shape=(0, 3), dtype=float),
+    lambda loader: ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float),
+    lambda loader: ChunkedProperty(loader, "morphology", shape=(0,), dtype=int),
+    lambda loader: ChunkedProperty(
+        loader, "labels", shape=(0,), dtype=int, extract=encode_labels
+    ),
+)
+_ps_collections = (
+    lambda loader: ChunkedCollection(loader, "additional", shape=(0,), dtype=float),
+)
+
+
 class PlacementSet(
     Resource,
     ChunkLoader,
     IPlacementSet,
-    properties=(
-        lambda loader: ChunkedProperty(loader, "position", shape=(0, 3), dtype=float),
-        lambda loader: ChunkedProperty(loader, "rotation", shape=(0, 3), dtype=float),
-        lambda loader: ChunkedProperty(loader, "morphology", shape=(0,), dtype=int),
-        lambda loader: ChunkedProperty(
-            loader, "labels", shape=(0,), dtype=int, extract=encode_labels
-        ),
-    ),
-    collections=(
-        lambda loader: ChunkedCollection(loader, "additional", shape=(0,), dtype=float),
-    ),
+    properties=_ps_properties,
+    collections=_ps_collections,
 ):
     """
     Fetches placement data from storage.
@@ -64,6 +68,12 @@ class PlacementSet(
         Use :meth:`Scaffold.get_placement_set <bsb.core.Scaffold.get_placement_set>` to
         correctly obtain a PlacementSet.
     """
+
+    _position_chunks: ChunkedProperty
+    _morphology_chunks: ChunkedProperty
+    _rotation_chunks: ChunkedProperty
+    _labels_chunks: ChunkedProperty
+    _additional_chunks: ChunkedCollection
 
     def __init__(self, engine, cell_type):
         tag = cell_type.name
@@ -403,7 +413,7 @@ class PlacementSet(
 def encode_labels(data, ds):
     if ds is None:
         return EncodedLabels.none(len(data))
-    ps_group = ds.parent.parent.parent
+    ps_group = ds.parent.parent
     serialized = json.dumps(EncodedLabels.none(1).labels, default=list)
     labels = json.loads(ps_group.attrs.get("labelsets", serialized))
     return EncodedLabels(shape=data.shape, buffer=data, labels=labels)
