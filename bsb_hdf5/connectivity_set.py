@@ -447,8 +447,8 @@ class CSIterator:
     def __init__(self, cs, direction=None, local_=None, global_=None):
         self._cs = cs
         self._dir = direction
-        self._lchunks = chunklist(local_) if local_ is not None else None
-        self._gchunks = chunklist(global_) if global_ is not None else None
+        self._lchunks = local_
+        self._gchunks = global_
 
     def __iter__(self):
         if self._dir is None:
@@ -483,7 +483,7 @@ class CSIterator:
         elif isinstance(local_, Chunk):
             return (local_,)
         else:
-            return iter(local_)
+            return iter(chunklist(local_))
 
     def get_global_iter(self, direction, local_, global_):
         if global_ is None:
@@ -491,4 +491,4 @@ class CSIterator:
         elif isinstance(global_, Chunk):
             return (global_,)
         else:
-            return iter(global_)
+            return iter(chunklist(global_))
