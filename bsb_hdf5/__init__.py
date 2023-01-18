@@ -1,6 +1,6 @@
 from bsb import config
 from bsb.services import MPILock
-from bsb.storage.interfaces import Engine, StorageNode as IStorageNode
+from bsb.storage.interfaces import Engine, StorageNode as IStorageNode, NoopLock
 from .placement_set import PlacementSet
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
@@ -74,24 +74,11 @@ def _set_active_cfg(self, config):
     config._meta["active_config"] = True
 
 
-class NoopLock:
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-
 class HDF5Engine(Engine):
     def __init__(self, root, comm):
         super().__init__(root, comm)
         self._lock = MPILock.sync()
         self._readonly = False
-
-    def __eq__(self, other):
-        eq_format = self._format == getattr(other, "_format", None)
-        eq_root = self._root == getattr(other, "_root", None)
-        return eq_format and eq_root
 
     @property
     def root_slug(self):
@@ -191,20 +178,6 @@ class HDF5Engine(Engine):
 
     def _write_chunk_stats(self, handle, stats):
         handle.attrs["chunks"] = json.dumps(stats)
-
-    def read_only(self):
-        return ReadOnlyManager(self)
-
-
-class ReadOnlyManager:
-    def __init__(self, engine):
-        self._e = engine
-
-    def __enter__(self):
-        self._e._readonly = True
-
-    def __exit__(self, *args):
-        self._e._readonly = False
 
 
 def _get_default_root():
