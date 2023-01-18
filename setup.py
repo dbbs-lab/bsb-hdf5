@@ -39,7 +39,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     entry_points={
-        "bsb.engines": ["hdf5 = bsb_hdf5"],
+        "bsb.storage.engines": ["hdf5 = bsb_hdf5"],
     },
     python_requires="~=3.8",
     install_requires=requires,
