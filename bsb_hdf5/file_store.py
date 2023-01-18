@@ -1,8 +1,10 @@
+import time
+
+import numpy as np
 from bsb.storage.interfaces import FileStore as IFileStore
 from .resource import Resource
 from uuid import uuid4
 import json
-import io
 
 _root = "files"
 
@@ -11,44 +13,51 @@ class FileStore(Resource, IFileStore):
     def __init__(self, engine):
         super().__init__(engine, _root)
 
+    def __bool__(self):
+        return True
+
     def all(self):
         with self._engine._read():
             with self._engine._handle("r") as root:
                 store = root[self._path]
-                return {id: dict(f.attrs.items()) for id, f in store.items()}
+                return {id: json.loads(f.attrs["meta"]) for id, f in store.items()}
 
     def load(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
                 ds = root[f"{self._path}/{id}"]
-                return ds[()].decode("utf-8"), dict(ds.attrs)
-
-    def stream(self, id, binary=False):
-        content = self.load(id)
-        if not binary:
-            return io.TextIOWrapper(content)
-        else:
-            return io.BytesIO(content)
+                data = ds[()]
+                if encoding := ds.attrs.get("encoding"):
+                    data = data.decode(encoding)
+                return data, json.loads(ds.attrs["meta"])
 
     def remove(self, id):
         with self._engine._write():
             with self._engine._handle("a") as root:
                 del root[f"{self._path}/{id}"]
 
-    def store(self, content, meta=None, id=None):
+    def store(self, content, meta=None, id=None, encoding=None):
         if id is None:
             id = str(uuid4())
         if meta is None:
             meta = {}
+        meta["mtime"] = int(time.time())
         with self._engine._write():
             with self._engine._handle("a") as root:
                 store = root[self._path]
+                if isinstance(content, str):
+                    if encoding is None:
+                        encoding = "utf-8"
+                    content = content.encode(encoding)
+                content = np.array(content)
                 try:
                     ds = store.create_dataset(id, data=content)
                 except ValueError:
                     raise Exception(f"File `{id}` already exists in store.")
-                for k, v in meta.items():
-                    ds.attrs[k] = v
+                if encoding:
+                    ds.attrs["encoding"] = encoding
+                ds.attrs["meta"] = json.dumps(meta)
+                ds.attrs["mtime"] = meta["mtime"]
         return id
 
     def load_active_config(self):
@@ -59,6 +68,7 @@ class FileStore(Resource, IFileStore):
         :rtype: ~bsb.config.Configuration
         """
         from bsb.config import Configuration
+        from bsb.config._config import _bootstrap_components
 
         cfg_id = self._active_config_id()
         if cfg_id is None:
@@ -68,6 +78,7 @@ class FileStore(Resource, IFileStore):
             # It's a serialized Python dict, so it should be JSON readable. We don't use
             # evaluate because files might originate from untrusted sources.
             tree = json.loads(content)
+            _bootstrap_components(tree.get("components", []), self)
             cfg = Configuration(**tree)
             cfg._meta = meta
             return cfg
@@ -94,3 +105,23 @@ class FileStore(Resource, IFileStore):
     def _active_config_id(self):
         match = (id for id, m in self.all().items() if m.get("active_config", False))
         return next(match, None)
+
+    def has(self, id):
+        with self._engine._read():
+            with self._engine._handle("r") as root:
+                return id in root
+
+    def get_mtime(self, id):
+        with self._engine._read():
+            with self._engine._handle("r") as root:
+                return json.loads(root[id].attrs["mtime"])
+
+    def get_encoding(self, id):
+        with self._engine._read():
+            with self._engine._handle("r") as root:
+                return json.loads(root[id].attrs["encoding"])
+
+    def get_meta(self, id):
+        with self._engine._read():
+            with self._engine._handle("r") as root:
+                return json.loads(root[id].attrs["meta"])
