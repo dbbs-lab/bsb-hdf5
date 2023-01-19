@@ -74,6 +74,14 @@ def _set_active_cfg(self, config):
     config._meta["active_config"] = True
 
 
+class NoopLock:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 class HDF5Engine(Engine):
     def __init__(self, root, comm):
         super().__init__(root, comm)
