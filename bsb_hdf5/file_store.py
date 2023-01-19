@@ -114,14 +114,14 @@ class FileStore(Resource, IFileStore):
     def get_mtime(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
-                return json.loads(root[id].attrs["mtime"])
+                return root[self._path][id].attrs["mtime"]
 
     def get_encoding(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
-                return json.loads(root[id].attrs["encoding"])
+                return root[self._path][id].attrs["encoding"]
 
     def get_meta(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
-                return json.loads(root[id].attrs["meta"])
+                return json.loads(root[self._path][id].attrs["meta"])
