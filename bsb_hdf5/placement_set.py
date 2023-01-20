@@ -49,7 +49,7 @@ _ps_properties = (
     ),
 )
 _ps_collections = (
-    lambda loader: ChunkedCollection(loader, "additional", shape=(0,), dtype=float),
+    lambda loader: ChunkedCollection(loader, "additional", shape=None, dtype=float),
 )
 
 

@@ -159,9 +159,12 @@ class ChunkedProperty:
         self.shape = shape
         self.insert = insert
         self.extract = extract
-        maxshape = list(shape)
-        maxshape[0] = None
-        self.maxshape = tuple(maxshape)
+        if shape is not None:
+            maxshape = list(shape)
+            maxshape[0] = None
+            self.maxshape = tuple(maxshape)
+        else:
+            self.maxshape = None
 
     @handles_handles("r", lambda self: self.loader._engine)
     def load(self, raw=False, key=None, pad_by=None, handle=HANDLED):
@@ -171,7 +174,7 @@ class ChunkedProperty:
         chunked_data = tuple(data for c in chunks if (data := reader(c)).size)
         # No data? Return empty
         if not chunked_data:
-            data = np.empty(self.shape)
+            data = np.empty(self.shape if self.shape is not None else 0)
             if self.extract and not raw:
                 return self.extract(data, None)
             else:
@@ -223,13 +226,19 @@ class ChunkedProperty:
         self.loader.require_chunk(chunk, handle)
         chunk_group = handle[self._chunk_path(chunk)]
         if key not in chunk_group:
-            shape = list(self.shape)
-            shape[0] = len(data)
+            if self.shape is None:
+                shape = data.shape
+                maxshape = list(shape)
+                maxshape[0] = None
+            else:
+                shape = list(self.shape)
+                shape[0] = len(data)
+                maxshape = self.maxshape
             chunk_group.create_dataset(
                 key,
                 shape,
                 data=data,
-                maxshape=self.maxshape,
+                maxshape=maxshape,
                 dtype=self.dtype,
             )
         else:
