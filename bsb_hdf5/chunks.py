@@ -223,9 +223,11 @@ class ChunkedProperty:
         self.loader.require_chunk(chunk, handle)
         chunk_group = handle[self._chunk_path(chunk)]
         if key not in chunk_group:
+            shape = list(self.shape)
+            shape[0] = len(data)
             chunk_group.create_dataset(
                 key,
-                self.shape,
+                shape,
                 data=data,
                 maxshape=self.maxshape,
                 dtype=self.dtype,
@@ -275,7 +277,7 @@ class ChunkedCollection(ChunkedProperty):
     @handles_handles("r", lambda self: self.loader._engine)
     def keys(self, handle=HANDLED):
         try:
-            return handle[self.loader._path].attrs[f"{self.collection}_keys"]
+            return list(handle[self.loader._path].attrs[f"{self.collection}_keys"])
         except KeyError:
             return []
 
@@ -284,13 +286,13 @@ class ChunkedCollection(ChunkedProperty):
         return super().load(key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
-    def append(self, chunk, data, key, handle=HANDLED, **kwargs):
-        self._add_key(key)
+    def append(self, chunk, key, data, handle=HANDLED, **kwargs):
+        self._add_key(key, handle=handle)
         return super().append(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
     def overwrite(self, chunk, data, key, handle=HANDLED, **kwargs):
-        self._add_key(key)
+        self._add_key(key, handle=handle)
         return super().overwrite(chunk, data, key=key, handle=handle, **kwargs)
 
     @handles_handles("a", lambda self: self.loader._engine)
@@ -300,9 +302,9 @@ class ChunkedCollection(ChunkedProperty):
 
     @handles_handles("a", lambda self: self.loader._engine)
     def _add_key(self, key, handle=HANDLED):
-        keys = self.keys(handle=handle)
-        keys.append(key)
-        handle[self.loader._path].attrs[f"{self.collection}_keys"] = keys
+        keys = set(self.keys(handle=handle))
+        keys.add(key)
+        handle[self.loader._path].attrs[f"{self.collection}_keys"] = list(keys)
 
     @handles_handles("r", lambda self: self.loader._engine)
     def load_all(self, handle=HANDLED, **kwargs):
