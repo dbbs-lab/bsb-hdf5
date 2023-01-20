@@ -173,8 +173,11 @@ class PlacementSet(
         )
 
     @handles_handles("r")
-    def load_additional(self, handle=HANDLED):
-        return self._additional_chunks.load_all()
+    def load_additional(self, key=None, handle=HANDLED):
+        if key is None:
+            return self._additional_chunks.load_all()
+        else:
+            return self._additional_chunks.load(key)
 
     @handles_handles("r")
     def _get_morphology_loaders(self, handle=HANDLED):
