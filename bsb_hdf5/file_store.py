@@ -36,7 +36,7 @@ class FileStore(Resource, IFileStore):
             with self._engine._handle("a") as root:
                 del root[f"{self._path}/{id}"]
 
-    def store(self, content, meta=None, id=None, encoding=None):
+    def store(self, content, meta=None, id=None, encoding=None, overwrite=False):
         if id is None:
             id = str(uuid4())
         if meta is None:
@@ -50,6 +50,11 @@ class FileStore(Resource, IFileStore):
                         encoding = "utf-8"
                     content = content.encode(encoding)
                 content = np.array(content)
+                if overwrite:
+                    try:
+                        del store[id]
+                    except KeyError:
+                        pass
                 try:
                     ds = store.create_dataset(id, data=content)
                 except ValueError:
