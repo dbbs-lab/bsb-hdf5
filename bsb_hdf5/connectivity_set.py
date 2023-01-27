@@ -142,8 +142,8 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @handles_handles("a")
     def connect(self, pre_set, post_set, src_locs, dest_locs, handle=HANDLED):
-        src_locs = np.array(src_locs, copy=False, dtype=int)
-        dest_locs = np.array(dest_locs, copy=False, dtype=int)
+        src_locs = _point_to_2d(src_locs)
+        dest_locs = _point_to_2d(dest_locs)
         if not len(src_locs):
             return
         if len(src_locs) != len(dest_locs):
@@ -492,3 +492,13 @@ class CSIterator:
             return (global_,)
         else:
             return iter(chunklist(global_))
+
+
+def _point_to_2d(arr):
+    arr = np.array(arr, copy=False, dtype=int)
+    if arr.ndim == 1:
+        ret = np.full((len(arr), 3), -1)
+        ret[:, 0] = arr
+        return ret
+    else:
+        return arr
