@@ -9,7 +9,7 @@ ConnectivitySet) to organize :class:`.ChunkedProperty` and :class:`.ChunkedColle
 objects within them.
 """
 
-from bsb.storage._chunks import Chunk, chunklist
+from bsb.storage import Chunk, chunklist
 import numpy as np
 import contextlib
 from .resource import handles_handles, HANDLED
@@ -58,6 +58,7 @@ class ChunkLoader:
             # If any chunks have been written, this HDF5 file is tagged with a
             # chunk size
             size = self._get_chunk_size(handle)
+
         return chunklist(Chunk.from_id(int(c), size) for c in chunks)
 
     @contextlib.contextmanager
