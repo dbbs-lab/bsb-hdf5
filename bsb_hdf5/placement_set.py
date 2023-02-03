@@ -249,14 +249,13 @@ class PlacementSet(
                 )
             self.require_chunk(chunk, handle=handle)
 
-        if rotations is not None and morphologies is None:
-            raise ValueError("Can't append rotations without morphologies.")
         if positions is not None:
             self._position_chunks.append(chunk, positions)
         if morphologies is not None:
             self._append_morphologies(chunk, morphologies)
             if rotations is None:
                 rotations = np.zeros((len(morphologies), 3))
+        if rotations is not None:
             self._rotation_chunks.append(chunk, rotations)
 
         if additional is not None:
