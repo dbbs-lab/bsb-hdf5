@@ -144,7 +144,10 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                 root.create_dataset("graph", data=graph, dtype=int)
                 try:
                     for k, v in morphology.meta.items():
-                        root.attrs[f"meta:{k}"] = v if v is not None else np.nan
+                        try:
+                            root.attrs[f"meta:{k}"] = v if v is not None else np.nan
+                        except Exception:
+                            root.attrs[f"meta:json:{k}"] = json.dumps(v)
                 except Exception:
                     raise MorphologyRepositoryError(
                         f"Trying to store invalid {type(v)} metadata '{k}' on `{name}`."
@@ -167,4 +170,10 @@ class MorphologyRepository(Resource, IMorphologyRepository):
 
 
 def _meta(group):
-    return dict((k[5:], v) for k, v in group.attrs.items() if k.startswith("meta:"))
+    # Filter out all the keys that start with `meta:`. Deserialize JSON values if key
+    # starts with `meta:json:`.
+    return dict(
+        (k[10:], json.loads(v)) if k.startswith("meta:json:") else (k[5:], v)
+        for k, v in group.attrs.items()
+        if k.startswith("meta:")
+    )
