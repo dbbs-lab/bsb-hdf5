@@ -160,10 +160,7 @@ class PlacementSet(
         :raises: DatasetNotFoundError when the morphology data is not found.
         """
         data = self._morphology_chunks.load(handle=handle)
-        try:
-            loaders = self._get_morphology_loaders(handle=handle)
-        except KeyError:
-            loaders = []
+        loaders = self._get_morphology_loaders(handle=handle)
         if not allow_empty and (len(data) == 0 and (len(self) != 0 or len(loaders) == 0)):
             raise DatasetNotFoundError("No morphology data available.")
         if self._labels:
@@ -188,7 +185,10 @@ class PlacementSet(
         stor_mor = []
         for chunk in self.get_loaded_chunks():
             path = self.get_chunk_path(chunk)
-            _map = handle[path].attrs.get("morphology_loaders", [])
+            try:
+                _map = handle[path].attrs["morphology_loaders"]
+            except KeyError:
+                continue
             cmlist = self._engine.morphologies.select(_MapSelector(ps=self, names=_map))
             stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
             loaded_names.update(m.name for m in cmlist)
