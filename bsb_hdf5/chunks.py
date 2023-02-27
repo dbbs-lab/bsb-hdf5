@@ -193,17 +193,18 @@ class ChunkedProperty:
         key = self.name if key is None else key
 
         def read_chunk(chunk, pad=0):
+            pad_shape = self.shape[1:] if self.shape is not None else ()
             if pad_by:
                 pad = len(handle[self._chunk_path(chunk, pad_by)])
             try:
                 chunk_group = handle[self._chunk_path(chunk, key)]
             except KeyError:
                 chunk_group = None
-                data = np.zeros((pad, *self.shape[1:]), dtype=self.dtype)
+                data = np.zeros((pad, *pad_shape), dtype=self.dtype)
             else:
                 data = chunk_group[()]
                 if len(data) < pad:
-                    fillshape = (pad - len(data), *self.shape[1:])
+                    fillshape = (pad - len(data), *pad_shape)
                     data = np.concatenate((data, np.zeros(fillshape, dtype=self.dtype)))
             if not (raw or self.extract is None):
                 data = self.extract(data, chunk_group)
@@ -318,6 +319,8 @@ class ChunkedCollection(ChunkedProperty):
 
     @handles_handles("r", lambda self: self.loader._engine)
     def load_all(self, handle=HANDLED, **kwargs):
+        print("?", self)
         return {
-            key: super().load(key=key, handle=handle, **kwargs) for key in self.keys()
+            key: super(type(self), self).load(key=key, handle=handle, **kwargs)
+            for key in self.keys()
         }
