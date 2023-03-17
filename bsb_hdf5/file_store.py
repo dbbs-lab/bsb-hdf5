@@ -20,16 +20,18 @@ class FileStore(Resource, IFileStore):
         with self._engine._read():
             with self._engine._handle("r") as root:
                 store = root[self._path]
-                return {id: json.loads(f.attrs["meta"]) for id, f in store.items()}
+                return {
+                    id: json.loads(f.attrs.get("meta", "{}")) for id, f in store.items()
+                }
 
     def load(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
                 ds = root[f"{self._path}/{id}"]
                 data = ds[()]
-                if encoding := ds.attrs.get("encoding"):
+                if encoding := ds.attrs.get("encoding", None):
                     data = data.decode(encoding)
-                return data, json.loads(ds.attrs["meta"])
+                return data, json.loads(ds.attrs.get("meta", "{}"))
 
     def remove(self, id):
         with self._engine._write():
@@ -124,9 +126,9 @@ class FileStore(Resource, IFileStore):
     def get_encoding(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
-                return root[self._path][id].attrs["encoding"]
+                return root[self._path][id].attrs.get("encoding", None)
 
     def get_meta(self, id):
         with self._engine._read():
             with self._engine._handle("r") as root:
-                return json.loads(root[self._path][id].attrs["meta"])
+                return json.loads(root[self._path][id].attrs.get("meta", "{}"))
