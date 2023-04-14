@@ -159,15 +159,26 @@ class PlacementSet(
 
         :raises: DatasetNotFoundError when the morphology data is not found.
         """
-        data = self._morphology_chunks.load(handle=handle)
+        reader = self._morphology_chunks.get_chunk_reader(handle, True)
         loaders = self._get_morphology_loaders(handle=handle)
+        data = []
+        for chunk in self.get_loaded_chunks():
+            path = self.get_chunk_path(chunk)
+            try:
+                _map = handle[path].attrs["morphology_loaders"]
+            except KeyError:
+                continue
+            block = np.vectorize(list(loaders.keys()).index)(_map[reader(chunk)])
+            if len(block):
+                data.append(block)
         if not allow_empty and (len(data) == 0 and (len(self) != 0 or len(loaders) == 0)):
             raise DatasetNotFoundError("No morphology data available.")
+        data = np.concatenate(data)
         if self._labels:
             mask = self.get_label_mask(self._labels, handle=handle)
             data = data[mask]
         return MorphologySet(
-            loaders,
+            list(loaders.values()),
             data,
             labels=self._morphology_labels,
         )
@@ -181,17 +192,19 @@ class PlacementSet(
 
     @handles_handles("r")
     def _get_morphology_loaders(self, handle=HANDLED):
-        loaded_names = set()
-        stor_mor = []
+        stor_mor = {}
         for chunk in self.get_loaded_chunks():
             path = self.get_chunk_path(chunk)
             try:
                 _map = handle[path].attrs["morphology_loaders"]
             except KeyError:
                 continue
-            cmlist = self._engine.morphologies.select(_MapSelector(ps=self, names=_map))
-            stor_mor.extend(m for m in cmlist if m.name not in loaded_names)
-            loaded_names.update(m.name for m in cmlist)
+            stor_mor.update(
+                (m.name, m)
+                for m in self._engine.morphologies.select(
+                    _MapSelector(ps=self, names=_map)
+                )
+            )
         return stor_mor
 
     @handles_handles("a")
