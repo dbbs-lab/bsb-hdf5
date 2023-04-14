@@ -171,9 +171,13 @@ class PlacementSet(
             block = np.vectorize(list(loaders.keys()).index)(_map[reader(chunk)])
             if len(block):
                 data.append(block)
-        if not allow_empty and (len(data) == 0 and (len(self) != 0 or len(loaders) == 0)):
-            raise DatasetNotFoundError("No morphology data available.")
-        data = np.concatenate(data)
+        if len(data) == 0 and (len(self) != 0 or len(loaders) == 0):
+            if not allow_empty:
+                raise DatasetNotFoundError("No morphology data available.")
+            else:
+                data = np.empty(0, dtype=int)
+        else:
+            data = np.concatenate(data)
         if self._labels:
             mask = self.get_label_mask(self._labels, handle=handle)
             data = data[mask]
