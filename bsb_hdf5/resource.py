@@ -6,7 +6,7 @@ import inspect
 import functools
 
 if typing.TYPE_CHECKING:
-    from . import HDF5Engine as Engine
+    from . import HDF5Engine
 
 # Semantic marker for things that get injected
 HANDLED = None
@@ -51,8 +51,8 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
 
 
 class Resource:
-    def __init__(self, engine: "Engine", path: str):
-        self._engine: "Engine" = engine
+    def __init__(self, engine: "HDF5Engine", path: str):
+        self._engine: "HDF5Engine" = engine
         self._path = path
 
     def __eq__(self, other):
