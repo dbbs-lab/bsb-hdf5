@@ -308,10 +308,17 @@ class ConnectivitySet(Resource, IConnectivitySet):
 
     @handles_handles("r")
     def get_global_chunks(self, direction, local_, handle=HANDLED):
-        return chunklist(
-            Chunk(k, None)
-            for k in handle[self._path][f"{direction}/{local_.id}"].attrs["chunk_list"]
-        )
+        try:
+            chunk_group = handle[self._path][f"{direction}/{local_.id}"]
+        except KeyError:
+            # The local chunk does not exist, create empty chunklist.
+            return chunklist(())
+        else:
+            # The local chunk exists, return the list of chunks it has data of.
+            return chunklist(
+                Chunk(k, None)
+                for k in chunk_group.attrs["chunk_list"]
+            )
 
     def nested_iter_connections(self, direction=None, local_=None, global_=None):
         """
