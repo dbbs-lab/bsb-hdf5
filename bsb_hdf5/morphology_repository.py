@@ -18,6 +18,8 @@ class MorphologyRepository(Resource, IMorphologyRepository):
         super().__init__(engine, _root)
 
     def select(self, *selectors):
+        if not selectors:
+            return []
         all_loaders = self.all()
         selected = []
         for selector in selectors:
