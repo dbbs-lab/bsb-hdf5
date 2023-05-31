@@ -13,6 +13,14 @@ import itertools
 _root = "/morphologies"
 
 
+class MetaEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        else:
+            super().default(o)
+
+
 class MorphologyRepository(Resource, IMorphologyRepository):
     def __init__(self, engine):
         super().__init__(engine, _root)
@@ -28,39 +36,57 @@ class MorphologyRepository(Resource, IMorphologyRepository):
         return selected
 
     @handles_handles("r")
-    def preload(self, name, handle=HANDLED):
+    def preload(self, name, meta=None, handle=HANDLED):
         return StoredMorphology(
-            name, self._make_loader(name), self.get_meta(name, handle=handle)
+            name,
+            self._make_loader(name, meta),
+            meta if meta is not None else self.get_meta(name, handle=handle),
         )
 
-    def _make_loader(self, name):
+    def _make_loader(self, name, meta):
         def loader():
-            return self.load(name)
+            return self.load(name, preloaded_meta=meta)
 
         return loader
 
     @handles_handles("r")
     def get_meta(self, name, handle=HANDLED):
+        all_meta = self.get_all_meta(handle=handle)
         try:
-            meta = _meta(handle[f"{self._path}/{name}/"])
+            meta = all_meta[name]
         except KeyError:
             raise MissingMorphologyError(
                 f"`{self._engine.root}` contains no morphology named `{name}`."
             ) from None
-        meta["name"] = name
         return meta
 
     @handles_handles("r")
+    def get_all_meta(self, handle=HANDLED):
+        if "morphology_meta" not in handle:
+            return {}
+        return json.loads(handle["morphology_meta"][()])
+
+    @handles_handles("a")
+    def set_all_meta(self, all_meta, handle=HANDLED):
+        if "morphology_meta" in handle:
+            del handle["morphology_meta"]
+        handle.create_dataset(
+            "morphology_meta", data=json.dumps(all_meta, cls=MetaEncoder)
+        )
+
+    @handles_handles("r")
     def all(self, handle=HANDLED):
-        l = [self.preload(name, handle=handle) for name in self.keys()]
-        return l
+        meta = self.get_all_meta(handle=handle)
+        return [
+            self.preload(name, meta=meta[name], handle=handle) for name in self.keys()
+        ]
 
     @handles_handles("r")
     def has(self, name, handle=HANDLED):
         return f"{self._path}/{name}" in handle
 
     @handles_handles("r")
-    def load(self, name, handle=HANDLED):
+    def load(self, name, preloaded_meta=None, handle=HANDLED):
         try:
             root = handle[f"{self._path}/{name}/"]
         except Exception:
@@ -100,14 +126,16 @@ class MorphologyRepository(Resource, IMorphologyRepository):
             else:
                 roots.append(branch)
             ptr = nptr
-        meta = _meta(root)
-        meta["name"] = name
+        if preloaded_meta is None:
+            meta = self.get_meta(handle=handle)
+        else:
+            meta = preloaded_meta
         morpho = Morphology(roots, meta, shared_buffers=(points, radii, labels, props))
         assert morpho._check_shared(), "Morpho read with unshareable buffers"
         return morpho
 
     @handles_handles("a")
-    def save(self, name, morphology, overwrite=False, handle=HANDLED):
+    def save(self, name, morphology, overwrite=False, update_meta=True, handle=HANDLED):
         me = handle[self._path]
         if self.has(name):
             if overwrite:
@@ -143,28 +171,17 @@ class MorphologyRepository(Resource, IMorphologyRepository):
             graph[i, 1] = parents[branch.parent]
             parents[branch] = i
         root.create_dataset("graph", data=graph, dtype=int)
-        try:
-            for k, v in morphology.meta.items():
-                # When saving a morphology under another name, force-override the
-                # `name` meta key to keep it in sync inside of the repository,
-                # without mutating the runtime object.
-                if k == "name":
-                    v = name
-                try:
-                    root.attrs[f"meta:{k}"] = v if v is not None else np.nan
-                except Exception:
-                    root.attrs[f"meta:json:{k}"] = json.dumps(v)
-        except Exception:
-            raise MorphologyRepositoryError(
-                f"Trying to store invalid {type(v)} metadata '{k}' on `{name}`."
-            ) from None
+        morphology.meta["name"] = name
         if len(morphology._shared._points):
-            root.attrs["meta:ldc"] = np.min(morphology._shared._points, axis=0)
-            root.attrs["meta:mdc"] = np.max(morphology._shared._points, axis=0)
+            morphology.meta["ldc"] = np.min(morphology._shared._points, axis=0)
+            morphology.meta["mdc"] = np.max(morphology._shared._points, axis=0)
         else:
-            root.attrs["meta:ldc"] = root.attrs["meta:mdc"] = np.nan
-        meta = _meta(root)
-        return StoredMorphology(name, lambda: morphology, meta)
+            morphology.meta["ldc"] = morphology.meta["mdc"] = np.nan
+        if update_meta:
+            all_meta = self.get_all_meta(handle=handle)
+            all_meta[name] = morphology.meta
+            self.set_all_meta(all_meta)
+        return StoredMorphology(name, lambda: morphology, morphology.meta)
 
     @handles_handles("a")
     def remove(self, name, handle=HANDLED):
@@ -172,13 +189,3 @@ class MorphologyRepository(Resource, IMorphologyRepository):
             del handle[f"{self._path}/{name}"]
         except KeyError:
             raise MorphologyRepositoryError(f"'{name}' doesn't exist.") from None
-
-
-def _meta(group):
-    # Filter out all the keys that start with `meta:`. Deserialize JSON values if key
-    # starts with `meta:json:`.
-    return dict(
-        (k[10:], json.loads(v)) if k.startswith("meta:json:") else (k[5:], v)
-        for k, v in group.attrs.items()
-        if k.startswith("meta:")
-    )
