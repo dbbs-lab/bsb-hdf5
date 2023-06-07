@@ -127,7 +127,7 @@ class MorphologyRepository(Resource, IMorphologyRepository):
                 roots.append(branch)
             ptr = nptr
         if preloaded_meta is None:
-            meta = self.get_meta(handle=handle)
+            meta = self.get_meta(name, handle=handle)
         else:
             meta = preloaded_meta
         morpho = Morphology(roots, meta, shared_buffers=(points, radii, labels, props))
