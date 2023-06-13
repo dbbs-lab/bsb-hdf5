@@ -14,6 +14,10 @@ _root = "/morphologies"
 
 
 class MetaEncoder(json.JSONEncoder):
+    """
+    Encodes morphology metadata to JSON
+    """
+
     def default(self, o):
         if isinstance(o, np.ndarray):
             return o.tolist()
