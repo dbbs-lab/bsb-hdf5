@@ -20,9 +20,19 @@ class MetaEncoder(json.JSONEncoder):
 
     def default(self, o):
         if isinstance(o, np.ndarray):
-            return o.tolist()
+            arr = o.tolist()
+            arr.append("__ndarray__")
+            return arr
         else:
             super().default(o)
+
+
+def meta_object_hook(obj):
+    for k, v in obj.items():
+        if isinstance(v, list) and v[-1] == "__ndarray__":
+            v.pop()
+            obj[k] = np.array(v)
+    return obj
 
 
 class MorphologyRepository(Resource, IMorphologyRepository):
@@ -68,7 +78,7 @@ class MorphologyRepository(Resource, IMorphologyRepository):
     def get_all_meta(self, handle=HANDLED):
         if "morphology_meta" not in handle:
             return {}
-        return json.loads(handle["morphology_meta"][()])
+        return json.loads(handle["morphology_meta"][()], object_hook=meta_object_hook)
 
     @handles_handles("a")
     def set_all_meta(self, all_meta, handle=HANDLED):
