@@ -1,2 +1,2 @@
-bsb[mpi]==4.0.0a48
+bsb[mpi]==4.0.0a54
 coverage==5.4

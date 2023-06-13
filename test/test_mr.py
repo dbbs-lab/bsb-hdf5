@@ -19,6 +19,7 @@ class TestHandcrafted(unittest.TestCase):
                 ds.attrs["labels"] = json.dumps({0: []})
                 ds.attrs["properties"] = []
                 g.create_dataset("graph", data=[])
+                f.create_dataset("morphology_meta", data=json.dumps({"M": {}}))
             with h5py.File("test2.h5", "w") as f:
                 g = f.create_group("morphologies")
                 g = g.create_group("M")
@@ -26,6 +27,7 @@ class TestHandcrafted(unittest.TestCase):
                 ds.attrs["labels"] = json.dumps({0: []})
                 ds.attrs["properties"] = []
                 g.create_dataset("graph", data=[[0, -1], [0, -1], [0, -1]])
+                f.create_dataset("morphology_meta", data=json.dumps({"M": {}}))
             with h5py.File("test3.h5", "w") as f:
                 g = f.create_group("morphologies")
                 g = g.create_group("M")
@@ -33,6 +35,7 @@ class TestHandcrafted(unittest.TestCase):
                 ds.attrs["labels"] = json.dumps({1: []})
                 ds.attrs["properties"] = []
                 g.create_dataset("graph", data=[[0, -1]])
+                f.create_dataset("morphology_meta", data=json.dumps({"M": {}}))
             with h5py.File("test4.h5", "w") as f:
                 g = f.create_group("morphologies")
                 g = g.create_group("M")
@@ -45,6 +48,7 @@ class TestHandcrafted(unittest.TestCase):
                 ds.attrs["labels"] = json.dumps({1: []})
                 ds.attrs["properties"] = []
                 g.create_dataset("graph", data=[[i + 1, -1] for i in range(5)])
+                f.create_dataset("morphology_meta", data=json.dumps({"M": {}}))
             with h5py.File("test5.h5", "w") as f:
                 g = f.create_group("morphologies")
                 g = g.create_group("M")
@@ -57,6 +61,7 @@ class TestHandcrafted(unittest.TestCase):
                 ds.attrs["labels"] = json.dumps({1: []})
                 ds.attrs["properties"] = []
                 g.create_dataset("graph", data=[[i + 1, -1] for i in range(4)] + [[5, 0]])
+                f.create_dataset("morphology_meta", data=json.dumps({"M": {}}))
         MPI.barrier()
 
     @classmethod
