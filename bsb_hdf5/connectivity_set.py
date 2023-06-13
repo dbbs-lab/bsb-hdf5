@@ -315,10 +315,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
             return chunklist(())
         else:
             # The local chunk exists, return the list of chunks it has data of.
-            return chunklist(
-                Chunk(k, None)
-                for k in chunk_group.attrs["chunk_list"]
-            )
+            return chunklist(Chunk(k, None) for k in chunk_group.attrs["chunk_list"])
 
     def nested_iter_connections(self, direction=None, local_=None, global_=None):
         """
