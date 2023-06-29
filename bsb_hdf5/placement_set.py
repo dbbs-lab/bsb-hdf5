@@ -212,8 +212,9 @@ class PlacementSet(
                 continue
             for label in _map:
                 if label not in stor_mor and label in meta:
-                    stor_mor[label] = self._engine.morphologies.preload(name=label,
-                                                                        meta=meta[label])
+                    stor_mor[label] = self._engine.morphologies.preload(
+                        name=label, meta=meta[label]
+                    )
         return stor_mor
 
     @handles_handles("a")
@@ -256,7 +257,7 @@ class PlacementSet(
         :type rotations: ~bsb.morphologies.RotationSet
         :param morphologies: Cell morphologies
         :type morphologies: ~bsb.morphologies.MorphologySet
-        :param additional: Additional data to attach to chunck
+        :param additional: Additional data to attach to chunk
         :type additional: dict
         :param count: Amount of entities to place. Excludes the use of any positional,
           rotational or morphological data.
@@ -306,7 +307,7 @@ class PlacementSet(
         :param count: Amount of entities to place. Excludes the use of any positional,
           rotational or morphological data.
         :type count: int
-        :param additional: Additional data to attach to chunck
+        :param additional: Additional data to attach to chunk
         :type additional: dict
         """
         self.append_data(chunk, count=count, additional=additional)
