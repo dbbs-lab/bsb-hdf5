@@ -158,7 +158,7 @@ class PlacementSet(
         Preload the cell morphologies.
 
         :param handle: hdf5 file handler
-        :type handle: hdf5.File
+        :type handle: :class:`h5py.File`
         :param allow_empty: If False (default), will raise an error in absence of morphologies,
         :type allow_empty: bool
         :returns: MorphologySet object containing the loader of all morphologies
@@ -262,7 +262,7 @@ class PlacementSet(
         :param count: Amount of entities to place. Excludes the use of any positional,
           rotational or morphological data.
         :type count: int
-        :param handle: h5py file handler
+        :param handle: hdf5 file handler
         :type handle: :class:`h5py.Group`
         """
         if not isinstance(chunk, Chunk):
