@@ -81,6 +81,12 @@ class MorphologyRepository(Resource, IMorphologyRepository):
         return json.loads(handle["morphology_meta"][()], object_hook=meta_object_hook)
 
     @handles_handles("a")
+    def update_all_meta(self, meta, handle=HANDLED):
+        all_meta = self.get_all_meta(handle=handle)
+        all_meta.update(meta)
+        self.set_all_meta(all_meta, handle=handle)
+
+    @handles_handles("a")
     def set_all_meta(self, all_meta, handle=HANDLED):
         if "morphology_meta" in handle:
             del handle["morphology_meta"]
