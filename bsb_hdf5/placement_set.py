@@ -211,10 +211,15 @@ class PlacementSet(
             except KeyError:
                 continue
             for label in _map:
-                if label not in stor_mor and label in meta:
-                    stor_mor[label] = self._engine.morphologies.preload(
-                        name=label, meta=meta[label]
-                    )
+                if label not in stor_mor:
+                    if label in meta:
+                        stor_mor[label] = self._engine.morphologies.preload(
+                            name=label, meta=meta[label]
+                        )
+                    else:
+                        raise DatasetNotFoundError(
+                            f"No metadata found for stored morphology {label}"
+                        )
         return stor_mor
 
     @handles_handles("a")
