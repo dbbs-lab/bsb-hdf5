@@ -244,15 +244,20 @@ class PlacementSet(
         Append data to the placement set.
 
         :param chunk: The chunk to store data in.
+        :type chunk: ~bsb.storage.Chunk
         :param positions: Cell positions
         :type positions: :class:`numpy.ndarray`
         :param rotations: Cell rotations
         :type rotations: ~bsb.morphologies.RotationSet
         :param morphologies: Cell morphologies
         :type morphologies: ~bsb.morphologies.MorphologySet
+        :param additional: Additional data to attach to chunk
+        :type additional: dict
         :param count: Amount of entities to place. Excludes the use of any positional,
           rotational or morphological data.
         :type count: int
+        :param handle: hdf5 file handler
+        :type handle: :class:`h5py.Group`
         """
         if not isinstance(chunk, Chunk):
             chunk = Chunk(chunk, None)
@@ -278,7 +283,7 @@ class PlacementSet(
         if additional is not None:
             for key, ds in additional.items():
                 self.append_additional(key, chunk, ds)
-        self._track_add(handle, chunk, len(positions))
+        self._track_add(handle, chunk, len(positions) if positions is not None else count)
 
     def _append_morphologies(self, chunk, new_set):
         with self.chunk_context([chunk]):
@@ -288,6 +293,17 @@ class PlacementSet(
             self._morphology_chunks.append(chunk, morphology_set.get_indices())
 
     def append_entities(self, chunk, count, additional=None):
+        """
+        Append entities to the placement set.
+
+        :param chunk: The chunk to store data in.
+        :type chunk: ~bsb.storage.Chunk
+        :param count: Amount of entities to place. Excludes the use of any positional,
+          rotational or morphological data.
+        :type count: int
+        :param additional: Additional data to attach to chunk
+        :type additional: dict
+        """
         self.append_data(chunk, count=count, additional=additional)
 
     def append_additional(self, name, chunk, data):
@@ -402,12 +418,12 @@ class PlacementSet(
         stats = global_stats.setdefault(
             str(chunk.id), {"placed": 0, "connections": {"inc": 0, "out": 0}}
         )
-        stats["placed"] += count
+        stats["placed"] += int(count)
         handle.attrs["chunks"] = json.dumps(global_stats)
         # Track addition in placement set
         handle[self._path].attrs["len"] = handle[self._path].attrs.get("len", 0) + count
         chunk_stats = json.loads(handle[self._path].attrs.get("chunks", "{}"))
-        chunk_stats[str(chunk.id)] = chunk_stats.get(str(chunk.id), 0) + count
+        chunk_stats[str(chunk.id)] = chunk_stats.get(str(chunk.id), 0) + int(count)
         handle[self._path].attrs["chunks"] = json.dumps(chunk_stats)
 
     @handles_handles("r")
