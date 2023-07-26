@@ -155,8 +155,14 @@ class PlacementSet(
     @handles_handles("r")
     def load_morphologies(self, handle=HANDLED, allow_empty=False):
         """
-        Load the cell morphologies.
+        Preload the cell morphologies.
 
+        :param handle: hdf5 file handler
+        :type handle: :class:`h5py.File`
+        :param allow_empty: If False (default), will raise an error in absence of morphologies,
+        :type allow_empty: bool
+        :returns: MorphologySet object containing the loader of all morphologies
+        :rtype: bsb.morphologies.MorphologySet
         :raises: DatasetNotFoundError when the morphology data is not found.
         """
         reader = self._morphology_chunks.get_chunk_reader(handle, True)
@@ -197,18 +203,23 @@ class PlacementSet(
     @handles_handles("r")
     def _get_morphology_loaders(self, handle=HANDLED):
         stor_mor = {}
+        meta = self._engine.morphologies.get_all_meta()
         for chunk in self.get_loaded_chunks():
             path = self.get_chunk_path(chunk)
             try:
                 _map = handle[path].attrs["morphology_loaders"]
             except KeyError:
                 continue
-            stor_mor.update(
-                (m.name, m)
-                for m in self._engine.morphologies.select(
-                    _MapSelector(ps=self, names=_map)
-                )
-            )
+            for label in _map:
+                if label not in stor_mor:
+                    if label in meta:
+                        stor_mor[label] = self._engine.morphologies.preload(
+                            name=label, meta=meta[label]
+                        )
+                    else:
+                        raise DatasetNotFoundError(
+                            f"No metadata found for stored morphology {label}"
+                        )
         return stor_mor
 
     @handles_handles("a")
