@@ -13,7 +13,7 @@ HANDLED = None
 
 
 # Decorator to inject handles
-def handles_handles(handle_type, handler=lambda self: self._engine):
+def handles_handles(handle_type, handler=lambda args: args[0]._engine):
     lock_f = {"r": lambda eng: eng._read, "a": lambda eng: eng._write}.get(handle_type)
 
     def decorator(f):
@@ -25,15 +25,15 @@ def handles_handles(handle_type, handler=lambda self: self._engine):
             )
 
         @functools.wraps(f)
-        def handle_indirection(self, *args, handle=None, **kwargs):
-            engine = handler(self)
+        def handle_indirection(*args, handle=None, **kwargs):
+            engine = handler(args)
             lock = lock_f(engine)
             try:
-                bound = sig.bind(self, *args, **kwargs)
+                bound = sig.bind(*args, **kwargs)
             except TypeError:
                 # Re-call the actual function, for better TypeError
                 try:
-                    f(self, *args, **kwargs)
+                    f(*args, **kwargs)
                 except TypeError as e:
                     # Re-raise the exception from None for better stack trace
                     raise e from None

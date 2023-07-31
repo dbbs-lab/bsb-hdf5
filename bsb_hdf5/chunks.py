@@ -167,7 +167,7 @@ class ChunkedProperty:
         else:
             self.maxshape = None
 
-    @handles_handles("r", lambda self: self.loader._engine)
+    @handles_handles("r", lambda args: args[0].loader._engine)
     def load(self, raw=False, key=None, pad_by=None, handle=HANDLED):
         chunks = self.loader.get_loaded_chunks()
         reader = self.get_chunk_reader(handle, raw, key, pad_by=pad_by)
@@ -213,7 +213,7 @@ class ChunkedProperty:
         # Return the created function
         return read_chunk
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def append(self, chunk, data, key=None, handle=HANDLED):
         """
         Append data to a property chunk. Will create it if it doesn't exist.
@@ -249,7 +249,7 @@ class ChunkedProperty:
             dset.resize(start_pos + len(data), axis=0)
             dset[start_pos:] = data
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def clear(self, chunk, key=None, handle=HANDLED):
         key = key or self.name
         chunk_group = handle[self._chunk_path(chunk)]
@@ -265,7 +265,7 @@ class ChunkedProperty:
             dset = chunk_group[key]
             dset.resize(0, axis=0)
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def overwrite(self, chunk, data, key=None, handle=HANDLED):
         self.clear(chunk, key, handle)
         self.append(chunk, data, key, handle)
@@ -285,39 +285,39 @@ class ChunkedCollection(ChunkedProperty):
     def __init__(self, loader, collection, shape, dtype, insert=None, extract=None):
         super().__init__(loader, None, shape, dtype, insert, extract, collection)
 
-    @handles_handles("r", lambda self: self.loader._engine)
+    @handles_handles("r", lambda args: args[0].loader._engine)
     def keys(self, handle=HANDLED):
         try:
             return list(handle[self.loader._path].attrs[f"{self.collection}_keys"])
         except KeyError:
             return []
 
-    @handles_handles("r", lambda self: self.loader._engine)
+    @handles_handles("r", lambda args: args[0].loader._engine)
     def load(self, key, handle=HANDLED, **kwargs):
         return super().load(key=key, handle=handle, **kwargs)
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def append(self, chunk, key, data, handle=HANDLED, **kwargs):
         self._add_key(key, handle=handle)
         return super().append(chunk, data, key=key, handle=handle, **kwargs)
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def overwrite(self, chunk, data, key, handle=HANDLED, **kwargs):
         self._add_key(key, handle=handle)
         return super().overwrite(chunk, data, key=key, handle=handle, **kwargs)
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def clear(self, chunk, handle=HANDLED):
         del handle[self._chunk_path(chunk)]
         handle.create_group(self._chunk_path(chunk))
 
-    @handles_handles("a", lambda self: self.loader._engine)
+    @handles_handles("a", lambda args: args[0].loader._engine)
     def _add_key(self, key, handle=HANDLED):
         keys = set(self.keys(handle=handle))
         keys.add(key)
         handle[self.loader._path].attrs[f"{self.collection}_keys"] = list(keys)
 
-    @handles_handles("r", lambda self: self.loader._engine)
+    @handles_handles("r", lambda args: args[0].loader._engine)
     def load_all(self, handle=HANDLED, **kwargs):
         print("?", self)
         return {

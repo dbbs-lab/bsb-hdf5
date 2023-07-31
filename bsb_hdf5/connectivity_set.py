@@ -23,35 +23,34 @@ class ConnectivitySet(Resource, IConnectivitySet):
         to correctly obtain a :class:`~bsb.storage.interfaces.ConnectivitySet`.
     """
 
-    def __init__(self, engine, tag):
+    @handles_handles("r", handler=lambda args: args[1])
+    def __init__(self, engine, tag, handle=HANDLED):
         self.tag = tag
         self.pre_type = None
         self.post_type = None
         super().__init__(engine, _root + tag)
-        with engine._read():
-            with engine._handle("r") as h:
-                if not self.exists(engine, tag, handle=h):
-                    raise DatasetNotFoundError(
-                        f"ConnectivitySet '{tag}' does not exist. Choose from: "
-                        + errr.quotejoin(self.get_tags(self._engine))
-                    )
-                self._pre_name = h[self._path].attrs["pre"]
-                self._post_name = h[self._path].attrs["post"]
+        if not self.exists(engine, tag, handle=handle):
+            raise DatasetNotFoundError(
+                f"ConnectivitySet '{tag}' does not exist. Choose from: "
+                + errr.quotejoin(self.get_tags(self._engine))
+            )
+        self.pre_type_name = handle[self._path].attrs["pre"]
+        self.post_type_name = handle[self._path].attrs["post"]
 
     def __len__(self):
         return sum(len(data[0]) for _, _, _, data in self.flat_iter_connections("inc"))
 
     @classmethod
-    def get_tags(cls, engine):
+    @handles_handles("r", handler=lambda args: args[1])
+    def get_tags(cls, engine, handle=HANDLED):
         """
         Returns all the connectivity tags in the network.
         """
-        with engine._read():
-            with engine._handle("r") as h:
-                return list(h[_root].keys())
+        return list(handle[_root].keys())
 
     @classmethod
-    def create(cls, engine, pre_type, post_type, tag=None):
+    @handles_handles("a", handler=lambda args: args[1])
+    def create(cls, engine, pre_type, post_type, tag=None, handle=HANDLED):
         """
         Create the structure for this connectivity set in the HDF5 file. Connectivity sets
         are stored under ``/connectivity/<tag>``.
@@ -59,20 +58,19 @@ class ConnectivitySet(Resource, IConnectivitySet):
         if tag is None:
             tag = f"{pre_type.name}_to_{post_type.name}"
         path = _root + tag
-        with engine._write():
-            with engine._handle("a") as h:
-                g = h.create_group(path)
-                g.attrs["pre"] = pre_type.name
-                g.attrs["post"] = post_type.name
-                g.require_group(f"{path}/inc")
-                g.require_group(f"{path}/out")
-        cs = cls(engine, tag)
+        g = handle.create_group(path)
+        g.attrs["pre"] = pre_type.name
+        g.attrs["post"] = post_type.name
+        g.require_group(f"{path}/inc")
+        g.require_group(f"{path}/out")
+        cs = cls(engine, tag, handle=handle)
         cs.pre_type = pre_type
         cs.post_type = post_type
         return cs
 
     @staticmethod
-    def exists(engine, tag, handle=None):
+    @handles_handles("r", handler=lambda args: args[0])
+    def exists(engine, tag, handle=HANDLED):
         """
         Checks whether a :class:`~.connectivity_set.ConnectivitySet` with the given tag
         exists.
@@ -86,19 +84,11 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :returns: Whether the tag exists.
         :rtype: bool
         """
-
-        def check(h):
-            return _root + tag in h
-
-        if handle is not None:
-            return check(handle)
-        else:
-            with engine._read():
-                with engine._handle("r") as h:
-                    return check(h)
+        return _root + tag in handle
 
     @classmethod
-    def require(cls, engine, pre_type, post_type, tag=None):
+    @handles_handles("a", handler=lambda args: args[1])
+    def require(cls, engine, pre_type, post_type, tag=None, handle=HANDLED):
         """
         Get or create a :class:`~.connectivity_set.ConnectivitySet`.
 
@@ -117,24 +107,22 @@ class ConnectivitySet(Resource, IConnectivitySet):
         if tag is None:
             tag = f"{pre_type.name}_to_{post_type.name}"
         path = _root + tag
-        with engine._write():
-            with engine._handle("a") as h:
-                g = h.require_group(path)
-                if g.attrs.setdefault("pre", pre_type.name) != pre_type.name:
-                    raise ValueError(
-                        "Given and stored type mismatch:"
-                        + f" {pre_type.name} vs {g.attrs['pre']}"
-                    )
-                if g.attrs.setdefault("post", post_type.name) != post_type.name:
-                    raise ValueError(
-                        "Given and stored type mismatch:"
-                        + f" {post_type.name} vs {g.attrs['post']}"
-                    )
-                g.require_group(path + "/inc")
-                g.require_group(path + "/out")
-        cs = cls(engine, tag)
-        cs.pre_type = pre_type
-        cs.post_type = post_type
+        g = handle.require_group(path)
+        if g.attrs.setdefault("pre", pre_type.name) != pre_type.name:
+            raise ValueError(
+                "Given and stored type mismatch:"
+                + f" {pre_type.name} vs {g.attrs['pre']}"
+            )
+        if g.attrs.setdefault("post", post_type.name) != post_type.name:
+            raise ValueError(
+                "Given and stored type mismatch:"
+                + f" {post_type.name} vs {g.attrs['post']}"
+            )
+        g.require_group(path + "/inc")
+        g.require_group(path + "/out")
+        cs = cls(engine, tag, handle=handle)
+        cs.pre_type_name = pre_type.name
+        cs.post_type_name = post_type.name
         return cs
 
     def clear(self):
