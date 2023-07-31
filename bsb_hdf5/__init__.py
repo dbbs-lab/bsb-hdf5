@@ -12,7 +12,7 @@ import os
 import shutil
 import shortuuid
 
-__version__ = "0.8.2"
+__version__ = "0.8.3"
 __all__ = [
     "PlacementSet",
     "ConnectivitySet",
