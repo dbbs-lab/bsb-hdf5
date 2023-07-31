@@ -443,20 +443,18 @@ class PlacementSet(
 
     @handles_handles("r")
     def load_ids(self, handle=HANDLED):
-        if self._chunks is None:
+        if self._chunks is None or not len(self._chunks):
             return np.arange(len(self))
         stats = self.get_chunk_stats(handle)
-        offsets = {}
+        ranges = []
         ctr = 0
-        return np.concatenate(
-            [
-                np.arange(ctr, (ctr := ctr + len_))
-                for chunk, len_ in sorted(
-                    stats.items(), key=lambda k: Chunk.from_id(int(k[0]), None).id
-                )
-                if chunk in self._chunks
-            ]
-        )
+        for chunk, len_ in sorted(
+            stats.items(), key=lambda k: Chunk.from_id(int(k[0]), None).id
+        ):
+            if chunk in self._chunks:
+                ranges.append(np.arange(ctr, ctr + len_))
+            ctr += len_
+        return np.concatenate(ranges)
 
 
 def encode_labels(data, ds):
