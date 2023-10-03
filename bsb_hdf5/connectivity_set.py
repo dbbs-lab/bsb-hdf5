@@ -125,8 +125,16 @@ class ConnectivitySet(Resource, IConnectivitySet):
         cs.post_type_name = post_type.name
         return cs
 
-    def clear(self):
-        raise NotImplementedError("Will do once I have some sample data :)")
+    @handles_handles("a")
+    def clear(self, handle=HANDLED):
+        path = _root + self.tag
+        g = handle.require_group(path)
+        del g["inc"]
+        del g["out"]
+        g.create_group("inc")
+        g.create_group("out")
+        g.attrs["len"] = 0
+        g.attrs["chunks"] = "{}"
 
     @handles_handles("a")
     def connect(self, pre_set, post_set, src_locs, dest_locs, handle=HANDLED):
