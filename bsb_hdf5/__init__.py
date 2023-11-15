@@ -1,3 +1,7 @@
+"""
+HDF5 storage engine for the BSB framework.
+"""
+
 from bsb import config
 from bsb.services import MPILock
 from bsb.storage.interfaces import Engine, StorageNode as IStorageNode, NoopLock
@@ -12,7 +16,7 @@ import os
 import shutil
 import shortuuid
 
-__version__ = "0.9.0"
+__version__ = "1.0.0b1"
 __all__ = [
     "PlacementSet",
     "ConnectivitySet",
