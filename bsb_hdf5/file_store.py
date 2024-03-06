@@ -75,7 +75,6 @@ class FileStore(Resource, IFileStore):
         :rtype: ~bsb.config.Configuration
         """
         from bsb.config import Configuration
-        from bsb.config._config import _bootstrap_components
 
         cfg_id = self._active_config_id()
         if cfg_id is None:
@@ -85,7 +84,6 @@ class FileStore(Resource, IFileStore):
             # It's a serialized Python dict, so it should be JSON readable. We don't use
             # evaluate because files might originate from untrusted sources.
             tree = json.loads(content)
-            _bootstrap_components(tree.get("components", []), self)
             cfg = Configuration(**tree)
             cfg._meta = meta
             return cfg
