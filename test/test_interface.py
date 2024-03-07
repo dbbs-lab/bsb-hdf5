@@ -1,4 +1,4 @@
-from bsb.unittest.engines import (
+from bsb_test.engines import (
     TestStorage as _TestStorage,
     TestPlacementSet as _TestPlacementSet,
     TestMorphologyRepository as _TestMorphologyRepository,

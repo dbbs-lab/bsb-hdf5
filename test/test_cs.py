@@ -1,4 +1,5 @@
-from bsb.unittest import FixedPosConfigFixture, RandomStorageFixture, NumpyTestCase
+from bsb.services.pool import WorkflowError
+from bsb_test import FixedPosConfigFixture, RandomStorageFixture, NumpyTestCase
 from bsb.core import Scaffold
 from bsb_hdf5.connectivity_set import LocationOutOfBoundsError
 import unittest
@@ -31,5 +32,9 @@ class TestConnectivitySet(
             f(pre_set, post_set, src_locs + [100, 0, 0], dest_locs + [100, 0, 0])
 
         self.network.connectivity.all_to_all.connect_cells = pre_oob_connect
-        with self.assertRaises(LocationOutOfBoundsError):
+        with self.assertRaises(WorkflowError) as wfe:
             self.network.compile(append=True, skip_placement=True)
+        if self.network.is_main_process():
+            self.assertEqual(
+                type(wfe.exception.exceptions[0].error), LocationOutOfBoundsError
+            )

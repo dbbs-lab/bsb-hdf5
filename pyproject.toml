@@ -15,7 +15,7 @@ dependencies = ["bsb-core>=4.0.0b0,<=4.0.0b9999"]
 hdf5 = "bsb_hdf5"
 
 [project.optional-dependencies]
-test = ["bsb-test>=0.0.0b0,<=0.0.0b9999"]
+test = ["bsb-test>=0.0.0b15,<=0.0.0b9999"]
 
 [tool.flit.module]
 name = "bsb_hdf5"

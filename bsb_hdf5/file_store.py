@@ -2,6 +2,7 @@ import time
 
 import numpy as np
 from bsb.storage.interfaces import FileStore as IFileStore
+from bsb.exceptions import MissingActiveConfigError
 from .resource import Resource
 from uuid import uuid4
 import json
@@ -78,7 +79,7 @@ class FileStore(Resource, IFileStore):
 
         cfg_id = self._active_config_id()
         if cfg_id is None:
-            raise Exception("No active config")
+            raise MissingActiveConfigError("No active config")
         else:
             content, meta = self.load(cfg_id)
             # It's a serialized Python dict, so it should be JSON readable. We don't use
