@@ -54,4 +54,4 @@ values = ["dev", "a", "b", "rc", "final"]
 optional_value = "final"
 
 [[tool.bumpversion.files]]
-filename = "bsb/__init__.py"
+filename = "bsb_hdf5/__init__.py"
