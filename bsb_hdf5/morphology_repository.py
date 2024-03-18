@@ -96,9 +96,10 @@ class MorphologyRepository(Resource, IMorphologyRepository):
 
     @handles_handles("r")
     def all(self, handle=HANDLED):
-        meta = self.get_all_meta(handle=handle)
+        all_meta = self.get_all_meta(handle=handle)
         return [
-            self.preload(name, meta=meta[name], handle=handle) for name in self.keys()
+            self.preload(name, meta=meta, handle=handle)
+            for name, meta in all_meta.items()
         ]
 
     @handles_handles("r")

@@ -168,15 +168,16 @@ class PlacementSet(
         reader = self._morphology_chunks.get_chunk_reader(handle, True)
         loaders = self._get_morphology_loaders(handle=handle)
         data = []
-        for chunk in self.get_loaded_chunks():
-            path = self.get_chunk_path(chunk)
-            try:
-                _map = handle[path].attrs["morphology_loaders"]
-            except KeyError:
-                continue
-            block = np.vectorize(list(loaders.keys()).index)(_map[reader(chunk)])
-            if len(block):
-                data.append(block)
+        if loaders:
+            for chunk in self.get_loaded_chunks():
+                path = self.get_chunk_path(chunk)
+                try:
+                    _map = handle[path].attrs["morphology_loaders"]
+                except KeyError:
+                    continue
+                block = np.vectorize(list(loaders.keys()).index)(_map[reader(chunk)])
+                if len(block):
+                    data.append(block)
         if len(data) == 0 and (len(self) != 0 or len(loaders) == 0):
             if not allow_empty:
                 raise DatasetNotFoundError("No morphology data available.")
@@ -294,7 +295,9 @@ class PlacementSet(
         if additional is not None:
             for key, ds in additional.items():
                 self.append_additional(key, chunk, ds)
-        self._track_add(handle, chunk, len(positions) if positions is not None else count)
+        self._track_add(
+            handle, chunk, len(positions) if positions is not None else count
+        )
 
     def _append_morphologies(self, chunk, new_set):
         with self.chunk_context([chunk]):
@@ -394,7 +397,9 @@ class PlacementSet(
 
     @handles_handles("r")
     def get_label_mask(self, labels, handle=HANDLED):
-        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(labels)
+        return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(
+            labels
+        )
 
     def _lendemux(self):
         """
