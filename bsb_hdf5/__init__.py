@@ -2,7 +2,7 @@
 HDF5 storage engine for the BSB framework.
 """
 
-from bsb import config
+from bsb import config, __version__ as bsb_version
 from bsb.services import MPILock
 from bsb.storage.interfaces import Engine, StorageNode as IStorageNode, NoopLock
 from .placement_set import PlacementSet
@@ -93,6 +93,15 @@ class HDF5Engine(Engine):
         self._readonly = False
 
     @property
+    def versions(self):
+        with self._handle("r") as handle:
+            return {
+                "bsb": handle.attrs["bsb_version"],
+                "engine": "bsb-hdf5",
+                "version": handle.attrs["bsb_hdf5_version"],
+            }
+
+    @property
     def root_slug(self):
         return os.path.relpath(self._root)
 
@@ -134,6 +143,8 @@ class HDF5Engine(Engine):
     @on_main_until(lambda self: self.exists())
     def create(self):
         with self._handle("w") as handle:
+            handle.attrs["bsb_hdf5_version"] = __version__
+            handle.attrs["bsb_version"] = bsb_version
             handle.create_group("placement")
             handle.create_group("connectivity")
             handle.create_group("files")
