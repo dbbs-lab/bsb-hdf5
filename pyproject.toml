@@ -15,7 +15,16 @@ dependencies = ["bsb-core>=4.0.0b0,<=4.0.0b9999"]
 hdf5 = "bsb_hdf5"
 
 [project.optional-dependencies]
-test = ["bsb-test>=0.0.0b15,<=0.0.0b9999"]
+test = ["bsb-test>=0.0.0b15,<=0.0.0b9999", "coverage~=7.0", "bsb-core[parallel]"]
+docs = [
+    "sphinx==5.0.2",
+    "colour==0.1.5",
+    "sphinxemoji==0.2.0",
+    "toml==0.10.2",
+    "furo==2022.6.21",
+    "sphinx_design==0.2",
+    "sphinx-copybutton==0.5.0"
+]
 
 [tool.flit.module]
 name = "bsb_hdf5"
