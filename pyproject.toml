@@ -16,7 +16,7 @@ hdf5 = "bsb_hdf5"
 
 [project.optional-dependencies]
 parallel = ["bsb-core[parallel]"]
-test = ["bsb-test>=0.0.0b15,<=0.0.0b9999", "coverage~=7.0", "bsb-core[parallel]"]
+test = ["bsb-test>=0.0.0rc1,<=0.0.0rc9999", "coverage~=7.0", "bsb-core[parallel]"]
 docs = [
     "sphinx==5.0.2",
     "colour==0.1.5",
@@ -31,7 +31,7 @@ docs = [
 name = "bsb_hdf5"
 
 [tool.bumpversion]
-current_version = "1.0.0-b6"
+current_version = "1.0.0-rc0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

@@ -21,7 +21,7 @@ import os
 import shutil
 import shortuuid
 
-__version__ = "1.0.0-b6"
+__version__ = "1.0.0-rc0"
 __all__ = [
     "PlacementSet",
     "ConnectivitySet",
