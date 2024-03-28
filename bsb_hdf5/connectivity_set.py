@@ -1,8 +1,11 @@
 import errr
-from bsb.exceptions import DatasetNotFoundError
+from bsb import (
+    DatasetNotFoundError,
+    Chunk,
+    chunklist,
+    ConnectivitySet as IConnectivitySet,
+)
 from .resource import Resource, handles_handles, HANDLED
-from bsb.storage._chunks import Chunk, chunklist
-from bsb.storage.interfaces import ConnectivitySet as IConnectivitySet
 import numpy as np
 import json
 
@@ -475,7 +478,9 @@ class CSIterator:
                 )
             )
         else:
-            yield self._cs.load_block_connections(self._dir, self._lchunks, self._gchunks)
+            yield self._cs.load_block_connections(
+                self._dir, self._lchunks, self._gchunks
+            )
 
     def get_local_iter(self, direction, local_):
         if local_ is None:

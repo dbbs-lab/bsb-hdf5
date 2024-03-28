@@ -15,6 +15,7 @@ dependencies = ["bsb-core>=4.0.0b0,<=4.0.0b9999"]
 hdf5 = "bsb_hdf5"
 
 [project.optional-dependencies]
+parallel = ["bsb-core[parallel]"]
 test = ["bsb-test>=0.0.0b15,<=0.0.0b9999", "coverage~=7.0", "bsb-core[parallel]"]
 docs = [
     "sphinx==5.0.2",

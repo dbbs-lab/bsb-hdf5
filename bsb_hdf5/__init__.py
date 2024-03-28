@@ -2,9 +2,14 @@
 HDF5 storage engine for the BSB framework.
 """
 
-from bsb import config, __version__ as bsb_version
-from bsb.services import MPILock
-from bsb.storage.interfaces import Engine, StorageNode as IStorageNode, NoopLock
+from bsb import (
+    config,
+    __version__ as bsb_version,
+    MPILock,
+    Engine,
+    StorageNode as IStorageNode,
+    NoopLock,
+)
 from .placement_set import PlacementSet
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
