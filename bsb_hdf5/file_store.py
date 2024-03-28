@@ -3,8 +3,8 @@ import time
 from uuid import uuid4
 
 import numpy as np
-from bsb.exceptions import MissingActiveConfigError
-from bsb.storage.interfaces import FileStore as IFileStore
+from bsb import FileStore as IFileStore
+from bsb import MissingActiveConfigError
 
 from .resource import Resource
 

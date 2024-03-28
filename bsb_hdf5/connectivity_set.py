@@ -2,7 +2,7 @@ import json
 
 import errr
 import numpy as np
-from bsb import Chunk
+from bsb import CellType, Chunk
 from bsb import ConnectivitySet as IConnectivitySet
 from bsb import DatasetNotFoundError, chunklist
 
@@ -24,6 +24,9 @@ class ConnectivitySet(Resource, IConnectivitySet):
         Use :meth:`Scaffold.get_connectivity_set <bsb.core.Scaffold.get_connectivity_set>`
         to correctly obtain a :class:`~bsb.storage.interfaces.ConnectivitySet`.
     """
+
+    pre_type: CellType
+    post_type: CellType
 
     @handles_handles("r", handler=lambda args: args[1])
     def __init__(self, engine, tag, handle=HANDLED):
@@ -337,10 +340,10 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type direction: str
         :param local_: When omitted, iterates over all local chunks in the set. When
           given, it restricts the iteration to the given value(s).
-        :type local_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
+        :type local_: Union[~bsb.storage._chunks.Chunk, list[~bsb.storage._chunks.Chunk]]
         :param global_: When omitted, iterates over all global chunks in the set. When
           given, it restricts the iteration to the given value(s).
-        :type global_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
+        :type global_: Union[~bsb.storage._chunks.Chunk, list[~bsb.storage._chunks.Chunk]]
         :returns: An iterator that produces the next unrestricted iteration values, or
           the connection dataset that matches the iteration combination.
         """
@@ -363,13 +366,13 @@ class ConnectivitySet(Resource, IConnectivitySet):
         :type direction: str
         :param local_: When omitted, iterates over all local chunks in the set. When
           given, it restricts the iteration to the given value(s).
-        :type local_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
+        :type local_: Union[~bsb.storage._chunks.Chunk, list[~bsb.storage._chunks.Chunk]]
         :param global_: When omitted, iterates over all global chunks in the set. When
           given, it restricts the iteration to the given value(s).
-        :type global_: Union[~bsb.storage.Chunk, list[~bsb.storage.Chunk]]
+        :type global_: Union[~bsb.storage._chunks.Chunk, list[~bsb.storage._chunks.Chunk]]
         :returns: Yields the direction, local chunk, global chunk, and data. The data is a
           tuple of the local and global connection locations.
-        :rtype: Tuple[str, ~bsb.storage.Chunk, ~bsb.storage.Chunk,
+        :rtype: Tuple[str, ~bsb.storage._chunks.Chunk, ~bsb.storage._chunks.Chunk,
           Tuple[numpy.ndarray, numpy.ndarray]]
         """
         itr = CSIterator(self, direction, local_, global_)
@@ -389,9 +392,9 @@ class ConnectivitySet(Resource, IConnectivitySet):
           perspective or ``out`` for the outgoing perspective.
         :type direction: str
         :param local_: Local chunk
-        :type local_: ~bsb.storage.Chunk
+        :type local_: ~bsb.storage._chunks.Chunk
         :param global_: Global chunk
-        :type global_: ~bsb.storage.Chunk
+        :type global_: ~bsb.storage._chunks.Chunk
         :param handle: This parameter is injected and doesn't have to be passed.
         :returns: The local and global connections locations
         :rtype: Tuple[numpy.ndarray, numpy.ndarray]
@@ -415,7 +418,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
           perspective or ``out`` for the outgoing perspective.
         :type direction: str
         :param local_: Local chunk
-        :type local_: ~bsb.storage.Chunk
+        :type local_: ~bsb.storage._chunks.Chunk
         :param handle: This parameter is injected and doesn't have to be passed.
         :returns: The local connection locations, a vector of the global connection chunks
           (1 chunk id per connection) and the global connections locations. To identify a

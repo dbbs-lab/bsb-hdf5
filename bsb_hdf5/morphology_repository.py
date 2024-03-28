@@ -2,11 +2,10 @@ import itertools
 import json
 
 import numpy as np
+from bsb import Branch, MissingMorphologyError, Morphology
+from bsb import MorphologyRepository as IMorphologyRepository
+from bsb import MorphologyRepositoryError, StoredMorphology
 from bsb._encoding import EncodedLabels
-from bsb.exceptions import MissingMorphologyError, MorphologyRepositoryError
-from bsb.morphologies import Branch, Morphology
-from bsb.storage.interfaces import MorphologyRepository as IMorphologyRepository
-from bsb.storage.interfaces import StoredMorphology
 
 from .resource import HANDLED, Resource, handles_handles
 

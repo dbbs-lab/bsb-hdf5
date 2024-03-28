@@ -75,7 +75,7 @@ class ChunkLoader:
         Return the full HDF5 path of a chunk.
 
         :param chunk: Chunk
-        :type chunk: :class:`bsb.storage.Chunk`
+        :type chunk: :class:`bsb.storage._chunks.Chunk`
         :returns: HDF5 path
         :rtype: str
         """
@@ -222,7 +222,7 @@ class ChunkedProperty:
 
         :param data: Data to append to the chunked property.
         :param chunk: Chunk
-        :type chunk: :class:`bsb.storage.Chunk`
+        :type chunk: :class:`bsb.storage._chunks.Chunk`
         """
         key = key or self.name
         if self.insert is not None:

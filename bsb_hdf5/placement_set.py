@@ -2,17 +2,17 @@ import itertools
 import json
 
 import numpy as np
-from bsb import config
-from bsb._encoding import EncodedLabels
-from bsb.exceptions import (
+from bsb import (
+    Chunk,
     DatasetExistsError,
     DatasetNotFoundError,
     MissingMorphologyError,
+    MorphologySelector,
+    MorphologySet,
 )
-from bsb.morphologies import MorphologySet, RotationSet
-from bsb.morphologies.selector import MorphologySelector
-from bsb.storage._chunks import Chunk, chunklist
-from bsb.storage.interfaces import PlacementSet as IPlacementSet
+from bsb import PlacementSet as IPlacementSet
+from bsb import RotationSet, chunklist, config
+from bsb._encoding import EncodedLabels
 
 from .chunks import ChunkedCollection, ChunkedProperty, ChunkLoader
 from .resource import HANDLED, Resource, handles_handles
@@ -258,7 +258,7 @@ class PlacementSet(
         Append data to the placement set.
 
         :param chunk: The chunk to store data in.
-        :type chunk: ~bsb.storage.Chunk
+        :type chunk: ~bsb.storage._chunks.Chunk
         :param positions: Cell positions
         :type positions: :class:`numpy.ndarray`
         :param rotations: Cell rotations
@@ -313,7 +313,7 @@ class PlacementSet(
         Append entities to the placement set.
 
         :param chunk: The chunk to store data in.
-        :type chunk: ~bsb.storage.Chunk
+        :type chunk: ~bsb.storage._chunks.Chunk
         :param count: Amount of entities to place. Excludes the use of any positional,
           rotational or morphological data.
         :type count: int
