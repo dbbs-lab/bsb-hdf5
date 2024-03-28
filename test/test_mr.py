@@ -4,8 +4,7 @@ import unittest
 
 import h5py
 import numpy as np
-from bsb.services import MPI
-from bsb.storage import Storage
+from bsb import MPI, Storage
 
 
 class TestHandcrafted(unittest.TestCase):

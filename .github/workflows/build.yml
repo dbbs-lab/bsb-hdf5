@@ -33,6 +33,7 @@ jobs:
           pip install wheel
           pip install -r requirements.txt --prefer-binary
           pip install -e . --no-deps
+          pip install bsb-test==4.0.0rc3 --no-deps
       - name: Run tests & coverage
         run: |
           coverage run -p -m unittest

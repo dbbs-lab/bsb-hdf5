@@ -1,8 +1,7 @@
 import unittest
 
 import numpy as np
-from bsb.core import Scaffold
-from bsb.storage import Chunk
+from bsb import Chunk, Scaffold
 from bsb_test import NumpyTestCase, RandomStorageFixture, skip_parallel, timeout
 from bsb_test.configs import get_test_config
 
