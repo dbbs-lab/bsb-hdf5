@@ -9,14 +9,14 @@ readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = ["License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"]
 dynamic = ["version", "description"]
-dependencies = ["bsb-core>=4.0.0b0,<=4.0.0b9999"]
+dependencies = ["bsb-core==4.0.0rc2"]
 
 [project.entry-points."bsb.storage.engines"]
 hdf5 = "bsb_hdf5"
 
 [project.optional-dependencies]
 parallel = ["bsb-core[parallel]"]
-test = ["bsb-test>=0.0.0rc1,<=0.0.0rc9999", "coverage~=7.0", "bsb-core[parallel]"]
+test = ["bsb-test==4.0.0rc2", "coverage~=7.0", "bsb-core[parallel]"]
 docs = [
     "sphinx==5.0.2",
     "colour==0.1.5",
@@ -31,7 +31,7 @@ docs = [
 name = "bsb_hdf5"
 
 [tool.bumpversion]
-current_version = "1.0.0-rc0"
+current_version = "4.0.0-rc2"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
