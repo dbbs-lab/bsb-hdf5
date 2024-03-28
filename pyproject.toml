@@ -31,7 +31,7 @@ docs = [
 name = "bsb_hdf5"
 
 [tool.bumpversion]
-current_version = "1.0.0-b5"
+current_version = "1.0.0-b6"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
