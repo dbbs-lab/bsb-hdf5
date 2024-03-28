@@ -1,11 +1,12 @@
+import json
 import time
+from uuid import uuid4
 
 import numpy as np
-from bsb.storage.interfaces import FileStore as IFileStore
 from bsb.exceptions import MissingActiveConfigError
+from bsb.storage.interfaces import FileStore as IFileStore
+
 from .resource import Resource
-from uuid import uuid4
-import json
 
 _root = "files"
 

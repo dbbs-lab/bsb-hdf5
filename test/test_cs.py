@@ -1,8 +1,10 @@
-from bsb.services.pool import WorkflowError
-from bsb_test import FixedPosConfigFixture, RandomStorageFixture, NumpyTestCase
-from bsb.core import Scaffold
-from bsb_hdf5.connectivity_set import LocationOutOfBoundsError
 import unittest
+
+from bsb.core import Scaffold
+from bsb.services.pool import WorkflowError
+from bsb_test import FixedPosConfigFixture, NumpyTestCase, RandomStorageFixture
+
+from bsb_hdf5.connectivity_set import LocationOutOfBoundsError
 
 
 class TestConnectivitySet(

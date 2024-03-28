@@ -1,10 +1,11 @@
+import json
+import os
+import unittest
+
+import h5py
+import numpy as np
 from bsb.services import MPI
 from bsb.storage import Storage
-import numpy as np
-import unittest
-import json
-import h5py
-import os
 
 
 class TestHandcrafted(unittest.TestCase):
@@ -60,7 +61,9 @@ class TestHandcrafted(unittest.TestCase):
                 ds = g.create_dataset("data", data=data)
                 ds.attrs["labels"] = json.dumps({1: []})
                 ds.attrs["properties"] = []
-                g.create_dataset("graph", data=[[i + 1, -1] for i in range(4)] + [[5, 0]])
+                g.create_dataset(
+                    "graph", data=[[i + 1, -1] for i in range(4)] + [[5, 0]]
+                )
                 f.create_dataset("morphology_meta", data=json.dumps({"M": {}}))
         MPI.barrier()
 
@@ -121,9 +124,7 @@ class TestHandcrafted(unittest.TestCase):
         msg = "Single point unattached branches should still be root."
         self.assertEqual(5, len(m.roots), msg)
         self.assertEqual(5, len(m.branches), "Missing branch")
-        msg = (
-            "Flatten of single point branches should produce n-branch x n-vectors matrix."
-        )
+        msg = "Flatten of single point branches should produce n-branch x n-vectors matrix."
         matrix = m.flatten()
         self.assertEqual((5, 3), matrix.shape, msg)
         msg = "Flatten produced an incorrect matrix"

@@ -1,14 +1,14 @@
-from bsb.morphologies import Morphology, Branch
-from bsb._encoding import EncodedLabels
-from bsb.exceptions import MorphologyRepositoryError, MissingMorphologyError
-from bsb.storage.interfaces import (
-    MorphologyRepository as IMorphologyRepository,
-    StoredMorphology,
-)
-from .resource import Resource, handles_handles, HANDLED
-import numpy as np
-import json
 import itertools
+import json
+
+import numpy as np
+from bsb._encoding import EncodedLabels
+from bsb.exceptions import MissingMorphologyError, MorphologyRepositoryError
+from bsb.morphologies import Branch, Morphology
+from bsb.storage.interfaces import MorphologyRepository as IMorphologyRepository
+from bsb.storage.interfaces import StoredMorphology
+
+from .resource import HANDLED, Resource, handles_handles
 
 _root = "/morphologies"
 

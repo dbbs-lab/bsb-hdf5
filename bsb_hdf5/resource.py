@@ -1,9 +1,9 @@
+import functools
+import inspect
 import typing
 
-import numpy as np
 import h5py
-import inspect
-import functools
+import numpy as np
 
 if typing.TYPE_CHECKING:
     from . import HDF5Engine
@@ -57,7 +57,8 @@ class Resource:
 
     def __eq__(self, other):
         return (
-            self._engine == getattr(other, "_engine", None) and self._path == other._path
+            self._engine == getattr(other, "_engine", None)
+            and self._path == other._path
         )
 
     def require(self, handle):

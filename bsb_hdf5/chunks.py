@@ -9,10 +9,12 @@ ConnectivitySet) to organize :class:`.ChunkedProperty` and :class:`.ChunkedColle
 objects within them.
 """
 
-from bsb import Chunk, chunklist
-import numpy as np
 import contextlib
-from .resource import handles_handles, HANDLED
+
+import numpy as np
+from bsb import Chunk, chunklist
+
+from .resource import HANDLED, handles_handles
 
 
 class ChunkLoader:

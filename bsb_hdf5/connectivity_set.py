@@ -1,13 +1,12 @@
-import errr
-from bsb import (
-    DatasetNotFoundError,
-    Chunk,
-    chunklist,
-    ConnectivitySet as IConnectivitySet,
-)
-from .resource import Resource, handles_handles, HANDLED
-import numpy as np
 import json
+
+import errr
+import numpy as np
+from bsb import Chunk
+from bsb import ConnectivitySet as IConnectivitySet
+from bsb import DatasetNotFoundError, chunklist
+
+from .resource import HANDLED, Resource, handles_handles
 
 _root = "/connectivity/"
 

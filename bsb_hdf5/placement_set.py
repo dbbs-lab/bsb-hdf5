@@ -1,19 +1,21 @@
-from bsb.exceptions import (
-    MissingMorphologyError,
-    DatasetExistsError,
-    DatasetNotFoundError,
-)
-from bsb import config
-from bsb.storage._chunks import Chunk, chunklist
-from bsb._encoding import EncodedLabels
-from bsb.storage.interfaces import PlacementSet as IPlacementSet
-from bsb.morphologies import MorphologySet, RotationSet
-from bsb.morphologies.selector import MorphologySelector
-from .resource import Resource, handles_handles, HANDLED
-from .chunks import ChunkLoader, ChunkedProperty, ChunkedCollection
-import numpy as np
 import itertools
 import json
+
+import numpy as np
+from bsb import config
+from bsb._encoding import EncodedLabels
+from bsb.exceptions import (
+    DatasetExistsError,
+    DatasetNotFoundError,
+    MissingMorphologyError,
+)
+from bsb.morphologies import MorphologySet, RotationSet
+from bsb.morphologies.selector import MorphologySelector
+from bsb.storage._chunks import Chunk, chunklist
+from bsb.storage.interfaces import PlacementSet as IPlacementSet
+
+from .chunks import ChunkedCollection, ChunkedProperty, ChunkLoader
+from .resource import HANDLED, Resource, handles_handles
 
 _root = "/placement/"
 

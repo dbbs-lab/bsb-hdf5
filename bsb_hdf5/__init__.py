@@ -2,24 +2,22 @@
 HDF5 storage engine for the BSB framework.
 """
 
-from bsb import (
-    config,
-    __version__ as bsb_version,
-    MPILock,
-    Engine,
-    StorageNode as IStorageNode,
-    NoopLock,
-)
-from .placement_set import PlacementSet
+import json
+import os
+import shutil
+from datetime import datetime
+
+import h5py
+import shortuuid
+from bsb import Engine, MPILock, NoopLock
+from bsb import StorageNode as IStorageNode
+from bsb import __version__ as bsb_version
+from bsb import config
+
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
 from .morphology_repository import MorphologyRepository
-from datetime import datetime
-import json
-import h5py
-import os
-import shutil
-import shortuuid
+from .placement_set import PlacementSet
 
 __version__ = "4.0.0-rc2"
 __all__ = [
