@@ -25,6 +25,16 @@ docs = [
     "sphinx-design~=0.5",
     "sphinx-copybutton~=0.5"
 ]
+dev  = [
+    "bsb-hdf5[test]",
+    "build~=1.0",
+    "twine~=4.0",
+    "pre-commit~=3.5",
+    "black~=24.1.1",
+    "isort~=5.12",
+    "snakeviz~=2.1",
+    "bump-my-version~=0.24"
+]
 
 [tool.isort]
 profile = "black"
