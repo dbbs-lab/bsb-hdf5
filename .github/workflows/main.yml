@@ -14,11 +14,9 @@ jobs:
     uses: ./.github/workflows/build.yml
   docs:
     uses: ./.github/workflows/docs.yml
-  api:
-    uses: ./.github/workflows/api.yml
 
   tag_release:
-    needs: [isort, black, build, docs, api]
+    needs: [isort, black, build, docs]
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.semver.outputs.next }}
