@@ -92,7 +92,7 @@ class NoopLock:
 class HDF5Engine(Engine):
     def __init__(self, root, comm):
         super().__init__(root, comm)
-        self._lock = MPILock.sync()
+        self._lock = MPILock.sync(comm._comm)
         self._readonly = False
 
     @property
