@@ -9,7 +9,7 @@ from datetime import datetime
 
 import h5py
 import shortuuid
-from bsb import Engine, MPILock, NoopLock
+from bsb import Engine, MPILock, NoopLock, report
 from bsb import StorageNode as IStorageNode
 from bsb import __version__ as bsb_version
 from bsb import config
@@ -108,13 +108,16 @@ class HDF5Engine(Engine):
     def root_slug(self):
         return os.path.relpath(self._root)
 
-    @classmethod
-    def recognizes(cls, root):
-        try:
-            h5py.File(root, "r").close()
-            return True
-        except Exception:
-            return False
+    @staticmethod
+    def recognizes(root, comm):
+        outcome = False
+        if comm.get_rank() == 0:
+            try:
+                h5py.File(root, "r").close()
+                outcome = True
+            except Exception as e:
+                report(f"Cannot open hdf5 file {root}: {e}.", level=1)
+        return comm.bcast(outcome, root=0)
 
     def _read(self):
         if self._readonly:
@@ -195,6 +198,7 @@ class HDF5Engine(Engine):
             }
             self._write_chunk_stats(handle, stats)
 
+    @on_main()
     def get_chunk_stats(self):
         with self._handle("r") as handle:
             return self._read_chunk_stats(handle)
