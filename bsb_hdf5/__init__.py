@@ -95,6 +95,7 @@ class HDF5Engine(Engine):
         self._lock = MPILock.sync(comm._comm)
         self._readonly = False
 
+    @on_main()
     @property
     def versions(self):
         with self._handle("r") as handle:
@@ -109,15 +110,14 @@ class HDF5Engine(Engine):
         return os.path.relpath(self._root)
 
     @staticmethod
-    def recognizes(root, comm):
-        outcome = False
-        if comm.get_rank() == 0:
+    def recognizes(root, lock):
+        with lock.read():
             try:
                 h5py.File(root, "r").close()
-                outcome = True
+                return True
             except Exception as e:
                 report(f"Cannot open hdf5 file {root}: {e}.", level=1)
-        return comm.bcast(outcome, root=0)
+                return False
 
     def _read(self):
         if self._readonly:
