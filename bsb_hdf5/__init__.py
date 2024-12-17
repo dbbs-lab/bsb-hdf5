@@ -9,10 +9,10 @@ from datetime import datetime
 
 import h5py
 import shortuuid
-from bsb import Engine, MPILock, NoopLock, report
+from bsb import Engine, MPILock, NoopLock
 from bsb import StorageNode as IStorageNode
 from bsb import __version__ as bsb_version
-from bsb import config
+from bsb import config, report
 
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
