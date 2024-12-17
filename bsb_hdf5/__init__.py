@@ -120,10 +120,8 @@ class HDF5Engine(Engine):
                 return False
 
     def _read(self):
-        if self._readonly:
-            return NoopLock()
-        else:
-            return self._lock.read()
+        # h5py does not deal with concurrent read access
+        return self._lock.read()
 
     def _write(self):
         if self._readonly:
