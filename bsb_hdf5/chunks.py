@@ -123,9 +123,11 @@ class ChunkLoader:
             for c in self._collections:
                 chunk_group.create_group(path + f"/{c.collection}")
 
-    def clear(self, chunks=None):
+    @handles_handles("a")
+    def clear(self, chunks=None, handle=HANDLED):
         if chunks is None:
             chunks = self.get_loaded_chunks()
+            del handle.attrs["chunk_size"]
         for chunk in chunks:
             for prop in self._properties:
                 prop.clear(chunk)
