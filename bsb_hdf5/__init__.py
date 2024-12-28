@@ -9,7 +9,7 @@ from datetime import datetime
 
 import h5py
 import shortuuid
-from bsb import Engine, MPILock, NoopLock
+from bsb import Engine, MPILock
 from bsb import StorageNode as IStorageNode
 from bsb import __version__ as bsb_version
 from bsb import config, report
@@ -110,7 +110,8 @@ class HDF5Engine(Engine):
         return os.path.relpath(self._root)
 
     @staticmethod
-    def recognizes(root, lock):
+    def recognizes(root, comm):
+        lock = MPILock.sync(comm)
         with lock.read():
             try:
                 h5py.File(root, "r").close()
