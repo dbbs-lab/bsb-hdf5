@@ -181,6 +181,7 @@ class HDF5Engine(Engine):
         with self._handle("a") as handle:
             handle.require_group("placement")
             del handle["placement"]
+            del handle.attrs["chunk_size"]
             handle.require_group("placement")
             self._write_chunk_stats(handle, {})
 
