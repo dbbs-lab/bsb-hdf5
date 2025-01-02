@@ -128,10 +128,8 @@ class ChunkLoader:
         if chunks is None:
             chunks = self.get_loaded_chunks()
         for chunk in chunks:
-            for prop in self._properties:
-                prop.clear(chunk)
-            for coll in self._collections:
-                coll.clear(chunk)
+            if self.get_chunk_path(chunk) in handle:
+                del handle[self.get_chunk_path(chunk)]
 
     def _set_chunk_size(self, handle, size):
         fsize = handle.attrs.get("chunk_size", np.full(3, np.nan))
