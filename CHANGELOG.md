@@ -1,4 +1,17 @@
 
+## [v5.0.0] - 2025-01-07
+### :boom: BREAKING CHANGES
+- due to [`7a89d49`](https://github.com/dbbs-lab/bsb-hdf5/commit/7a89d4921173ac0dd058c7c19a0286c785345a45) - mpi hdf5 *(PR [#36](https://github.com/dbbs-lab/bsb-hdf5/pull/36) by [@drodarie](https://github.com/drodarie))*:
+
+  mpi hdf5 (#36)
+
+
+### :recycle: Refactors
+- [`7a89d49`](https://github.com/dbbs-lab/bsb-hdf5/commit/7a89d4921173ac0dd058c7c19a0286c785345a45) - mpi hdf5 *(PR [#36](https://github.com/dbbs-lab/bsb-hdf5/pull/36) by [@drodarie](https://github.com/drodarie))*
+  - :arrow_lower_right: *addresses issue [#16](https://github.com/dbbs-lab/bsb-hdf5/issues/16) opened by [@Helveg](https://github.com/Helveg)*
+  - :arrow_lower_right: *addresses issue [#893](https://github.com/dbbs-lab/bsb-core/issues/893) opened by [@drodarie](https://github.com/drodarie)*
+
+
 ## [v4.1.1] - 2024-10-23
 ### :bug: Bug Fixes
 - [`ce29533`](https://github.com/dbbs-lab/bsb-hdf5/commit/ce29533c5479bf296c98af45b16bfe1d5ef29d3d) - forward mpi comm to lock system *(PR [#34](https://github.com/dbbs-lab/bsb-hdf5/pull/34) by [@drodarie](https://github.com/drodarie))*
@@ -10,3 +23,4 @@
 
 [v4.1.0]: https://github.com/dbbs-lab/bsb-hdf5/compare/v4.0.0...v4.1.0
 [v4.1.1]: https://github.com/dbbs-lab/bsb-hdf5/compare/v4.1.0...v4.1.1
+[v5.0.0]: https://github.com/dbbs-lab/bsb-hdf5/compare/v4.1.1...v5.0.0
