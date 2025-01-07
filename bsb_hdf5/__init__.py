@@ -9,10 +9,10 @@ from datetime import datetime
 
 import h5py
 import shortuuid
-from bsb import Engine, MPILock, NoopLock
+from bsb import Engine, MPILock
 from bsb import StorageNode as IStorageNode
 from bsb import __version__ as bsb_version
-from bsb import config
+from bsb import config, report
 
 from .connectivity_set import ConnectivitySet
 from .file_store import FileStore
@@ -95,6 +95,7 @@ class HDF5Engine(Engine):
         self._lock = MPILock.sync(comm._comm)
         self._readonly = False
 
+    @on_main()
     @property
     def versions(self):
         with self._handle("r") as handle:
@@ -108,19 +109,20 @@ class HDF5Engine(Engine):
     def root_slug(self):
         return os.path.relpath(self._root)
 
-    @classmethod
-    def recognizes(cls, root):
-        try:
-            h5py.File(root, "r").close()
-            return True
-        except Exception:
-            return False
+    @staticmethod
+    def recognizes(root, comm):
+        lock = MPILock.sync(comm)
+        with lock.read():
+            try:
+                h5py.File(root, "r").close()
+                return True
+            except Exception as e:
+                report(f"Cannot open hdf5 file {root}: {e}.", level=1)
+                return False
 
     def _read(self):
-        if self._readonly:
-            return NoopLock()
-        else:
-            return self._lock.read()
+        # h5py does not deal with concurrent read access
+        return self._lock.read()
 
     def _write(self):
         if self._readonly:
@@ -179,6 +181,7 @@ class HDF5Engine(Engine):
         with self._handle("a") as handle:
             handle.require_group("placement")
             del handle["placement"]
+            del handle.attrs["chunk_size"]
             handle.require_group("placement")
             self._write_chunk_stats(handle, {})
 
@@ -195,6 +198,7 @@ class HDF5Engine(Engine):
             }
             self._write_chunk_stats(handle, stats)
 
+    @on_main()
     def get_chunk_stats(self):
         with self._handle("r") as handle:
             return self._read_chunk_stats(handle)

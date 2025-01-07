@@ -1,6 +1,6 @@
 """
 The chunks module provides the tools for the HDF5 engine to store the chunked placement
-data received from the placement module in seperate datasets to arbitrarily parallelize
+data received from the placement module in separate datasets to arbitrarily parallelize
 and scale scaffold models.
 
 The module provides the :class:`.ChunkLoader` mixin for
@@ -24,7 +24,7 @@ class ChunkLoader:
 
     :param properties: An iterable of functions that construct :class:`.ChunkedProperty`.
     :type: Iterable
-    :param properties: An iterable of names for constructing :class:`.ChunkedCollection`.
+    :param collections: An iterable of names for constructing :class:`.ChunkedCollection`.
     :type: Iterable
     """
 
@@ -123,14 +123,13 @@ class ChunkLoader:
             for c in self._collections:
                 chunk_group.create_group(path + f"/{c.collection}")
 
-    def clear(self, chunks=None):
+    @handles_handles("a")
+    def clear(self, chunks=None, handle=HANDLED):
         if chunks is None:
             chunks = self.get_loaded_chunks()
         for chunk in chunks:
-            for prop in self._properties:
-                prop.clear(chunk)
-            for coll in self._collections:
-                coll.clear(chunk)
+            if self.get_chunk_path(chunk) in handle:
+                del handle[self.get_chunk_path(chunk)]
 
     def _set_chunk_size(self, handle, size):
         fsize = handle.attrs.get("chunk_size", np.full(3, np.nan))
@@ -280,7 +279,7 @@ class ChunkedCollection(ChunkedProperty):
     """
     Chunked collections are stored inside the ``chunks`` group of the
     :class:`.ChunkLoader` they belong to. Inside the ``chunks`` group another group is
-    created per chunk, inside of which a group exists per collection. Arbitrarily named
+    created per chunk, inside which a group exists per collection. Arbitrarily named
     datasets can be stored inside of this collection.
     """
 
