@@ -1,4 +1,9 @@
 
+## [v5.0.2] - 2025-01-07
+### :bug: Bug Fixes
+- [`7bbe9b6`](https://github.com/dbbs-lab/bsb-hdf5/commit/7bbe9b6cf087719dd2c821102269c44ae018fffe) - typos in GHA for releases. *(commit by [@drodarie](https://github.com/drodarie))*
+
+
 ## [v5.0.0] - 2025-01-07
 ### :boom: BREAKING CHANGES
 - due to [`7a89d49`](https://github.com/dbbs-lab/bsb-hdf5/commit/7a89d4921173ac0dd058c7c19a0286c785345a45) - mpi hdf5 *(PR [#36](https://github.com/dbbs-lab/bsb-hdf5/pull/36) by [@drodarie](https://github.com/drodarie))*:
@@ -24,3 +29,4 @@
 [v4.1.0]: https://github.com/dbbs-lab/bsb-hdf5/compare/v4.0.0...v4.1.0
 [v4.1.1]: https://github.com/dbbs-lab/bsb-hdf5/compare/v4.1.0...v4.1.1
 [v5.0.0]: https://github.com/dbbs-lab/bsb-hdf5/compare/v4.1.1...v5.0.0
+[v5.0.2]: https://github.com/dbbs-lab/bsb-hdf5/compare/v5.0.1...v5.0.2
