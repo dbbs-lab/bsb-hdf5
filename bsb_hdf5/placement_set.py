@@ -88,33 +88,30 @@ class PlacementSet(
             raise DatasetNotFoundError(f"PlacementSet '{tag}' does not exist")
 
     @classmethod
-    def create(cls, engine, cell_type):
+    @handles_handles("a", handler=lambda args: args[0])
+    def create(cls, engine, cell_type, handle=HANDLED):
         """
         Create the structure for this placement set in the HDF5 file. Placement sets are
         stored under ``/placement/<tag>``.
         """
         tag = cell_type.name
         path = _root + tag
-        with engine._write():
-            with engine._handle("a") as h:
-                if path in h:
-                    raise DatasetExistsError(f"PlacementSet '{tag}' already exists.")
-                h.create_group(path)
+        if path in handle:
+            raise DatasetExistsError(f"PlacementSet '{tag}' already exists.")
+        handle.create_group(path)
         return cls(engine, cell_type)
 
     @staticmethod
-    def exists(engine, cell_type):
-        with engine._read():
-            with engine._handle("r") as h:
-                return "/placement/" + cell_type.name in h
+    @handles_handles("r", handler=lambda args: args[0])
+    def exists(engine, cell_type, handle=HANDLED):
+        return "/placement/" + cell_type.name in handle
 
     @classmethod
-    def require(cls, engine, cell_type):
+    @handles_handles("a", handler=lambda args: args[0])
+    def require(cls, engine, cell_type, handle=HANDLED):
         tag = cell_type.name
         path = _root + tag
-        with engine._write():
-            with engine._handle("a") as h:
-                h.require_group(path)
+        handle.require_group(path)
         return cls(engine, cell_type)
 
     @handles_handles("r")
