@@ -18,7 +18,13 @@ from bsb import (
 from bsb._encoding import EncodedLabels
 
 from .chunks import ChunkedCollection, ChunkedProperty, ChunkLoader
-from .resource import HANDLED, Resource, handles_handles
+from .resource import (
+    HANDLED,
+    Resource,
+    handles_class_handles,
+    handles_handles,
+    handles_static_handles,
+)
 
 _root = "/placement/"
 
@@ -91,7 +97,7 @@ class PlacementSet(
             raise DatasetNotFoundError(f"PlacementSet '{tag}' does not exist")
 
     @classmethod
-    @handles_handles("a", handler=lambda args: args[1])
+    @handles_class_handles("a")
     def create(cls, engine, cell_type, handle=HANDLED):
         """
         Create the structure for this placement set in the HDF5 file. Placement sets are
@@ -105,12 +111,12 @@ class PlacementSet(
         return cls(engine, cell_type)
 
     @staticmethod
-    @handles_handles("r", handler=lambda args: args[0])
+    @handles_static_handles("r")
     def exists(engine, cell_type, handle=HANDLED):
         return "/placement/" + cell_type.name in handle
 
     @classmethod
-    @handles_handles("a", handler=lambda args: args[1])
+    @handles_class_handles("a")
     def require(cls, engine, cell_type, handle=HANDLED):
         tag = cell_type.name
         path = _root + tag
