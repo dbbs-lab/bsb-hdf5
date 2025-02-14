@@ -14,6 +14,11 @@ HANDLED = None
 
 # Decorator to inject handles
 def handles_handles(handle_type, handler=lambda args: args[0]._engine):
+    """
+    Decorator for :class:`~.resource.Resource` methods to lock and open hdf5 files.
+    By default, the first argument of the decorated function should be the Resource.
+    """
+
     lock_f = {"r": lambda eng: eng._read, "a": lambda eng: eng._write}.get(handle_type)
 
     def decorator(f):
@@ -48,6 +53,24 @@ def handles_handles(handle_type, handler=lambda args: args[0]._engine):
         return handle_indirection
 
     return decorator
+
+
+def handles_static_handles(handle_type):
+    """
+    Decorator for static methods to lock and open hdf5 files
+    The :class:`~bsb.storage.interfaces.Engine` handler is expected
+    to be the first argument of the decorated function
+    """
+    return handles_handles(handle_type, handler=lambda args: args[0])
+
+
+def handles_class_handles(handle_type):
+    """
+    Decorator for class methods to lock and open hdf5 files
+    The :class:`~bsb.storage.interfaces.Engine` handler is expected
+    to be the second argument of the decorated function
+    """
+    return handles_handles(handle_type, handler=lambda args: args[1])
 
 
 class Resource:

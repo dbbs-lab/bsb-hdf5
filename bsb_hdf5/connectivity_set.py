@@ -6,7 +6,13 @@ from bsb import CellType, Chunk
 from bsb import ConnectivitySet as IConnectivitySet
 from bsb import DatasetNotFoundError, chunklist
 
-from .resource import HANDLED, Resource, handles_handles
+from .resource import (
+    HANDLED,
+    Resource,
+    handles_class_handles,
+    handles_handles,
+    handles_static_handles,
+)
 
 _root = "/connectivity/"
 
@@ -46,7 +52,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return sum(len(data[0]) for _, _, _, data in self.flat_iter_connections("inc"))
 
     @classmethod
-    @handles_handles("r", handler=lambda args: args[1])
+    @handles_class_handles("r")
     def get_tags(cls, engine, handle=HANDLED):
         """
         Returns all the connectivity tags in the network.
@@ -54,7 +60,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return list(handle[_root].keys())
 
     @classmethod
-    @handles_handles("a", handler=lambda args: args[1])
+    @handles_class_handles("a")
     def create(cls, engine, pre_type, post_type, tag=None, handle=HANDLED):
         """
         Create the structure for this connectivity set in the HDF5 file. Connectivity sets
@@ -74,7 +80,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return cs
 
     @staticmethod
-    @handles_handles("r", handler=lambda args: args[0])
+    @handles_static_handles("r")
     def exists(engine, tag, handle=HANDLED):
         """
         Checks whether a :class:`~.connectivity_set.ConnectivitySet` with the given tag
@@ -92,7 +98,7 @@ class ConnectivitySet(Resource, IConnectivitySet):
         return _root + tag in handle
 
     @classmethod
-    @handles_handles("a", handler=lambda args: args[1])
+    @handles_class_handles("a")
     def require(cls, engine, pre_type, post_type, tag=None, handle=HANDLED):
         """
         Get or create a :class:`~.connectivity_set.ConnectivitySet`.
