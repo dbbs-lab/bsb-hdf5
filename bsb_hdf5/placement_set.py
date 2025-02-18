@@ -11,10 +11,7 @@ from bsb import (
     MorphologySet,
 )
 from bsb import PlacementSet as IPlacementSet
-from bsb import (
-    RotationSet,
-    config,
-)
+from bsb import RotationSet, config
 from bsb._encoding import EncodedLabels
 
 from .chunks import ChunkedCollection, ChunkedProperty, ChunkLoader
@@ -468,6 +465,29 @@ class PlacementSet(
                 ranges.append(np.arange(ctr, ctr + len_))
             ctr += len_
         return np.concatenate(ranges)
+
+    @handles_handles("r")
+    def convert_to_local(self, ids, handle=HANDLED):
+        """Converts a list of global ids to local ids, if the PlacementSet is not separated in chunks check the ids within a range on the full
+        size of the PS"""
+
+        if self._chunks is None or not len(self._chunks):
+            return np.isin(np.arange(len(self)), ids)
+        chunks = [x.id for x in self._chunks]
+        stats = np.array([[int(k), v] for k, v in self.get_chunk_stats(handle).items()])
+        ordered_stats_indexes = np.argsort(stats[:, 0])
+        ordered_stats = stats[ordered_stats_indexes]
+        local_chunks_indexes = np.arange(len(stats))[
+            np.isin(ordered_stats[:, 0], chunks)
+        ]
+        chunks_global_ids = [[] for _ in range(len(chunks))]
+        for i, c_indx in enumerate(local_chunks_indexes):
+            begin = np.sum(ordered_stats[:c_indx][:, 1])
+            end = begin + ordered_stats[c_indx][1]
+            chunks_global_ids[i] = np.arange(begin, end)
+        joined = np.concatenate(chunks_global_ids)
+        local_ids = np.isin(joined, ids)
+        return local_ids
 
 
 def encode_labels(data, ds):
