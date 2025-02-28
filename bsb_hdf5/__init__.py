@@ -19,7 +19,7 @@ from .file_store import FileStore
 from .morphology_repository import MorphologyRepository
 from .placement_set import PlacementSet
 
-__version__ = "5.0.2"
+__version__ = "5.0.3"
 __all__ = [
     "PlacementSet",
     "ConnectivitySet",
