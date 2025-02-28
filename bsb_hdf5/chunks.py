@@ -123,14 +123,6 @@ class ChunkLoader:
             for c in self._collections:
                 chunk_group.create_group(path + f"/{c.collection}")
 
-    @handles_handles("a")
-    def clear(self, chunks=None, handle=HANDLED):
-        if chunks is None:
-            chunks = self.get_loaded_chunks()
-        for chunk in chunks:
-            if self.get_chunk_path(chunk) in handle:
-                del handle[self.get_chunk_path(chunk)]
-
     def _set_chunk_size(self, handle, size):
         fsize = handle.attrs.get("chunk_size", np.full(3, np.nan))
         if np.all(np.isnan(fsize)):

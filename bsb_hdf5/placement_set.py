@@ -326,6 +326,17 @@ class PlacementSet(
         self._additional_chunks.append(chunk, name, data)
 
     @handles_handles("a")
+    def clear(self, chunks=None, handle=HANDLED):
+        path = _root + self.tag
+        g = handle.require_group(path)
+        stats = self._engine._read_chunk_stats(handle)
+        for chunk, data in g.items():
+            if chunks is None or chunk in chunks:
+                stats[chunk]["placed"] -= len(data["position"])
+                del g[chunk]
+        self._engine._write_chunk_stats(handle, stats)
+
+    @handles_handles("a")
     def label_by_mask(self, mask, labels, handle=HANDLED):
         cells = np.array(mask, copy=False)
         if cells.dtype != bool or len(cells) != len(self):
