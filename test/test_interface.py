@@ -1,5 +1,6 @@
 import unittest
 
+import numpy as np
 from bsb_test.engines import TestConnectivitySet as _TestConnectivitySet
 from bsb_test.engines import TestMorphologyRepository as _TestMorphologyRepository
 from bsb_test.engines import TestPlacementSet as _TestPlacementSet
@@ -11,7 +12,18 @@ class TestStorage(_TestStorage, unittest.TestCase, engine_name="hdf5"):
 
 
 class TestPlacementSet(_TestPlacementSet, unittest.TestCase, engine_name="hdf5"):
-    pass
+    def test_convert_to_local(self):
+        self.network.compile()
+        ps = self.network.get_placement_set("test_cell")
+        # Def a list of ids
+        glob_ids = [0, 3, 44, 77]
+        # Now we select to work on 2nd and 4rd chunk only
+        ps.set_chunk_filter([(1, 0, 0), (1, 0, 1)])
+        local_ids = ps.convert_to_local(glob_ids)
+        self.assertAll(
+            local_ids == np.array([19, 27]),
+            " [0,3] should have been discarded, [44,77] should have been converted to [19,27]",
+        )
 
 
 class TestMorphologyRepository(

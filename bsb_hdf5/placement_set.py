@@ -479,26 +479,30 @@ class PlacementSet(
         ordered_stats_indexes = np.argsort(stats[:, 0])
         ordered_stats = stats[ordered_stats_indexes]
         cumulative_chunk_lengths = np.cumsum(ordered_stats[:, 1])
+
         # Get list of Chunk id for every number in ids -> chunk_id_of_glob
         chunk_id_of_glob = np.searchsorted(cumulative_chunk_lengths, ids)
 
         # Now i will need to select only local chunks
-        common_elements = np.arange(len(ordered_stats))[
-            np.isin(ordered_stats[:, 0], chunks)
-        ]
-        local_chunks_stats = ordered_stats[
-            common_elements
-        ]  # Extract stats only for local chunks (ordered)
+        local_chunk_filter = np.isin(ordered_stats[:, 0], chunks)
+        common_elements = np.arange(len(ordered_stats))[local_chunk_filter]
+        local_chunks_stats = (
+            ordered_stats[:, 1] * local_chunk_filter
+        )  # Extract stats only for local chunks (ordered)
 
         # Compute a list of offset for local chunks
-        local_cumulative_lenghts = np.cumsum(local_chunks_stats[:, 1])
-        # Filter out ids that do not belong to local chunks
-        filter_ids_of_non_local_chunks = np.isin(chunk_id_of_glob, common_elements)
-        filtered_ids = ids[filter_ids_of_non_local_chunks]
-        filtered_chunk_id = chunk_id_of_glob[filter_ids_of_non_local_chunks]
+        local_cumulative_lenghts = np.cumsum(local_chunks_stats)
+
+        # From ids list we filter out only the elements that do not belong to local chunks
+        filter_ids_of_local_chunks = np.isin(chunk_id_of_glob, common_elements)
+        filtered_ids = ids[filter_ids_of_local_chunks]
+        filtered_chunk_id = chunk_id_of_glob[
+            filter_ids_of_local_chunks
+        ]  # filter also the list of Chunk id
 
         # Compute converted ids  by taking the GlobalId - OffsetonGlobalChunks + OffsetOnLocalChunks
         converted_ids = np.zeros(len(filtered_ids), dtype=int)
+
         for i, my_id in enumerate(filtered_ids):
             converted_ids[i] = (
                 my_id
