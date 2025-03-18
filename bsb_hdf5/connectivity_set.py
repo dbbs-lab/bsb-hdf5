@@ -140,6 +140,12 @@ class ConnectivitySet(Resource, IConnectivitySet):
     def clear(self, handle=HANDLED):
         path = _root + self.tag
         g = handle.require_group(path)
+        stats = self._engine._read_chunk_stats(handle)
+        for chunk, data in g["inc"].items():
+            stats[chunk]["connections"]["inc"] -= len(data["global_locs"])
+        for chunk, data in g["out"].items():
+            stats[chunk]["connections"]["out"] -= len(data["global_locs"])
+        self._engine._write_chunk_stats(handle, stats)
         del g["inc"]
         del g["out"]
         g.create_group("inc")
