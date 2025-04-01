@@ -495,7 +495,7 @@ class PlacementSet(
         cumulative_chunk_lengths = np.cumsum(ordered_stats[:, 1])
 
         # Get list of Chunk id for every number in ids -> chunk_id_of_glob
-        chunk_id_of_glob = np.searchsorted(cumulative_chunk_lengths, ids)
+        chunk_id_of_glob = np.searchsorted(cumulative_chunk_lengths - 1, ids)
 
         # Now i will need to select only local chunks
         local_chunk_filter = np.isin(ordered_stats[:, 0], chunks)
