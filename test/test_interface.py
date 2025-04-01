@@ -17,7 +17,7 @@ class TestPlacementSet(_TestPlacementSet, unittest.TestCase, engine_name="hdf5")
         ps = self.network.get_placement_set("test_cell")
         # Def a list of ids
         glob_ids = [0, 3, 44, 77]
-        # Now we select to work on 2nd and 4th chunk only
+        # Now we select to work on 2nd and 4th chunk only ( ordering is made on chunk id)
         ps.set_chunk_filter([(1, 0, 0), (1, 0, 1)])
         local_ids = ps.convert_to_local(glob_ids)
         self.assertAll(
@@ -32,7 +32,7 @@ class TestPlacementSet(_TestPlacementSet, unittest.TestCase, engine_name="hdf5")
         res_array = np.full(pop_size, False)
         self.assertAll(
             local_ids == res_array,
-            "If selected chunk has no one of the ids it should return an array of pop_size size filled with False value",
+            "If selected chunk has no one of the ids it should return an array of pop_size size filled with False values",
         )
 
 
