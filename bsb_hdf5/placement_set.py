@@ -523,11 +523,10 @@ class PlacementSet(
                 - cumulative_chunk_lengths[filtered_chunk_id[i]]
                 + local_cumulative_lenghts[filtered_chunk_id[i]]
             )
-
         return (
             converted_ids
             if len(converted_ids) > 0
-            else np.full(np.sum(local_chunks_stats[:, 1]), False)
+            else np.full(np.sum(local_chunks_stats), False)
         )
 
 
