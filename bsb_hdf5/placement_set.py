@@ -410,12 +410,21 @@ class PlacementSet(
         self._morphology_labels = morphology_labels
 
     @handles_handles("r")
-    def get_labelled(self, labels, handle=HANDLED):
+    def get_unique_labels(self, handle=HANDLED):
+        u, c = np.unique(
+            self._labels_chunks.load(handle=handle, pad_by="position"),
+            return_counts=True,
+        )
+        # take out the extra empty set
+        return list(u.labels.values())[-len(c) :]
+
+    @handles_handles("r")
+    def get_labelled(self, labels=None, handle=HANDLED):
         mask = self.get_label_mask(labels, handle=handle)
         return np.nonzero(mask)[0]
 
     @handles_handles("r")
-    def get_label_mask(self, labels, handle=HANDLED):
+    def get_label_mask(self, labels=None, handle=HANDLED):
         return self._labels_chunks.load(handle=handle, pad_by="position").get_mask(
             labels
         )
