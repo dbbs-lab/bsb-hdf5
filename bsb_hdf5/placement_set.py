@@ -489,6 +489,55 @@ class PlacementSet(
             ctr += len_
         return np.concatenate(ranges)
 
+    @handles_handles("r")
+    def convert_to_local(self, ids, handle=HANDLED):
+        """Converts a list of global ids to local ids, if the PlacementSet is not separated in chunks check the ids within a range on the full
+        size of the PS"""
+
+        if self._chunks is None or not len(self._chunks):
+            return ids
+        chunks = [x.id for x in self._chunks]
+        stats = np.array([[int(k), v] for k, v in self.get_chunk_stats(handle).items()])
+        ids = np.array(ids)
+        ordered_stats_indexes = np.argsort(stats[:, 0])
+        ordered_stats = stats[ordered_stats_indexes]
+        cumulative_chunk_lengths = np.cumsum(ordered_stats[:, 1])
+
+        # Get list of Chunk id for every number in ids -> chunk_id_of_glob
+        chunk_id_of_glob = np.searchsorted(cumulative_chunk_lengths - 1, ids)
+
+        # Now i will need to select only local chunks
+        local_chunk_filter = np.isin(ordered_stats[:, 0], chunks)
+        common_elements = np.arange(len(ordered_stats))[local_chunk_filter]
+        local_chunks_stats = (
+            ordered_stats[:, 1] * local_chunk_filter
+        )  # Extract stats only for local chunks (ordered)
+
+        # Compute a list of offset for local chunks
+        local_cumulative_lenghts = np.cumsum(local_chunks_stats)
+
+        # From ids list we filter out only the elements that do not belong to local chunks
+        filter_ids_of_local_chunks = np.isin(chunk_id_of_glob, common_elements)
+        filtered_ids = ids[filter_ids_of_local_chunks]
+        filtered_chunk_id = chunk_id_of_glob[
+            filter_ids_of_local_chunks
+        ]  # filter also the list of Chunk id
+
+        # Compute converted ids  by taking the GlobalId - OffsetonGlobalChunks + OffsetOnLocalChunks
+        converted_ids = np.zeros(len(filtered_ids), dtype=int)
+
+        for i, my_id in enumerate(filtered_ids):
+            converted_ids[i] = (
+                my_id
+                - cumulative_chunk_lengths[filtered_chunk_id[i]]
+                + local_cumulative_lenghts[filtered_chunk_id[i]]
+            )
+        return (
+            converted_ids
+            if len(converted_ids) > 0
+            else np.full(np.sum(local_chunks_stats), False)
+        )
+
 
 def encode_labels(data, ds):
     if ds is None:
